@@ -14,8 +14,10 @@ Con los comandos nuevos:
 
 - `zproxy service install`: registra servicio de usuario (LaunchAgent en macOS, systemd --user en Linux).
 - `zproxy service start`: inicia el servicio registrado.
+- `zproxy service restart`: reinicia el servicio registrado.
 - `zproxy service status`: muestra estado del servicio en launchctl/systemd.
 - `zproxy service stop`: detiene el servicio registrado.
+- `zproxy service logs [--lines N] [--follow]`: muestra logs del servicio.
 - `zproxy service uninstall`: elimina el servicio de usuario.
 - `zproxy start --detached`: arranca una instancia en background sin registrar servicio.
 - `zproxy start`: si detecta servicio instalado, ejecuta `service start`; si no, pregunta si quieres detached.
@@ -33,7 +35,7 @@ zproxy usa `~/.local/state/zproxy` para material de runtime:
 - `zproxy.lock`: lockfile para impedir arranques simultáneos.
 - `zproxy.sock`: socket Unix para control.
 
-El código también reserva la ruta `zproxy.log`, aunque el logging actual sale por stdout o stderr del proceso.
+El código también reserva la ruta `zproxy.log`, que se usa como destino de stdout/stderr cuando el daemon se arranca con `zproxy start --detached`.
 
 ## Socket de control
 
@@ -100,6 +102,29 @@ RUST_LOG=debug cargo run -- daemon
 RUST_LOG=trace cargo run -- daemon
 RUST_LOG=warn cargo run -- daemon
 ```
+
+Para consultar logs del servicio:
+
+```bash
+cargo run -- service logs
+cargo run -- service logs --lines 200
+cargo run -- service logs --follow
+```
+
+Para consultar logs sin importar el modo de arranque:
+
+```bash
+cargo run -- logs
+cargo run -- logs --follow
+cargo run -- logs --detached
+```
+
+`zproxy logs` usa el gestor de servicios si hay servicio instalado; en caso contrario hace tail de `~/.local/state/zproxy/zproxy.log`, que es donde escribe `zproxy start --detached`. Con `--detached` se fuerza siempre ese fichero.
+
+Detalles por plataforma:
+
+- macOS: lee `launchd.out.log` y `launchd.err.log` en `~/.local/state/zproxy`.
+- Linux: usa `journalctl --user -u zproxy.service`.
 
 ## Fallos comunes
 

@@ -43,6 +43,24 @@ pub fn start(paths: &config::AppPaths) -> Result<()> {
     }
 }
 
+pub fn restart(paths: &config::AppPaths) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        restart_macos(paths)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        restart_linux(paths)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = paths;
+        bail!("restart no está soportado en esta plataforma")
+    }
+}
+
 pub fn stop(paths: &config::AppPaths) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
@@ -77,6 +95,38 @@ pub fn status(paths: &config::AppPaths) -> Result<String> {
         let _ = paths;
         Ok("unsupported".to_string())
     }
+}
+
+pub fn logs(paths: &config::AppPaths, lines: usize, follow: bool) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        logs_macos(paths, lines, follow)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        logs_linux(paths, lines, follow)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (paths, lines, follow);
+        bail!("logs no está soportado en esta plataforma")
+    }
+}
+
+pub fn tail_file(path: &std::path::Path, lines: usize, follow: bool) -> Result<()> {
+    if !path.exists() {
+        bail!("no existe el fichero de log {}", path.display());
+    }
+
+    let mut args: Vec<String> = vec!["-n".to_string(), lines.to_string()];
+    if follow {
+        args.push("-f".to_string());
+    }
+    args.push(path.to_string_lossy().to_string());
+
+    run_cmd_stream("tail", &args)
 }
 
 pub fn uninstall(paths: &config::AppPaths) -> Result<()> {
@@ -199,6 +249,11 @@ fn start_macos(paths: &config::AppPaths) -> Result<()> {
 }
 
 #[cfg(target_os = "macos")]
+fn restart_macos(paths: &config::AppPaths) -> Result<()> {
+    start_macos(paths)
+}
+
+#[cfg(target_os = "macos")]
 fn stop_macos(paths: &config::AppPaths) -> Result<()> {
     let plist_path = launch_agent_plist(paths)?;
     if !plist_path.exists() {
@@ -237,6 +292,32 @@ fn status_macos(paths: &config::AppPaths) -> Result<String> {
         "installed=true running={} state={}",
         running, state
     ))
+}
+
+#[cfg(target_os = "macos")]
+fn logs_macos(paths: &config::AppPaths, lines: usize, follow: bool) -> Result<()> {
+    let out_log = paths.state_dir.join("launchd.out.log");
+    let err_log = paths.state_dir.join("launchd.err.log");
+
+    if !out_log.exists() && !err_log.exists() {
+        bail!(
+            "no se encontraron logs en {}",
+            paths.state_dir.to_string_lossy()
+        );
+    }
+
+    let mut args: Vec<String> = vec!["-n".to_string(), lines.to_string()];
+    if follow {
+        args.push("-f".to_string());
+    }
+    if out_log.exists() {
+        args.push(out_log.to_string_lossy().to_string());
+    }
+    if err_log.exists() {
+        args.push(err_log.to_string_lossy().to_string());
+    }
+
+    run_cmd_stream("tail", &args)
 }
 
 #[cfg(target_os = "macos")]
@@ -313,6 +394,11 @@ fn start_linux(_paths: &config::AppPaths) -> Result<()> {
 }
 
 #[cfg(target_os = "linux")]
+fn restart_linux(_paths: &config::AppPaths) -> Result<()> {
+    run_cmd("systemctl", &["--user", "restart", SERVICE_UNIT])
+}
+
+#[cfg(target_os = "linux")]
 fn stop_linux(_paths: &config::AppPaths) -> Result<()> {
     run_cmd("systemctl", &["--user", "stop", SERVICE_UNIT])
 }
@@ -332,6 +418,22 @@ fn status_linux(paths: &config::AppPaths) -> Result<String> {
     let active = output.status.success();
     let state = String::from_utf8_lossy(&output.stdout).trim().to_string();
     Ok(format!("installed=true running={} state={}", active, state))
+}
+
+#[cfg(target_os = "linux")]
+fn logs_linux(_paths: &config::AppPaths, lines: usize, follow: bool) -> Result<()> {
+    let mut args: Vec<String> = vec![
+        "--user".to_string(),
+        "-u".to_string(),
+        SERVICE_UNIT.to_string(),
+        "-n".to_string(),
+        lines.to_string(),
+    ];
+    if follow {
+        args.push("-f".to_string());
+    }
+
+    run_cmd_stream("journalctl", &args)
 }
 
 #[cfg(target_os = "linux")]
@@ -381,6 +483,19 @@ fn run_cmd(program: &str, args: &[&str]) -> Result<()> {
         stdout.trim(),
         stderr.trim()
     )
+}
+
+fn run_cmd_stream(program: &str, args: &[String]) -> Result<()> {
+    let status = Command::new(program)
+        .args(args)
+        .status()
+        .with_context(|| format!("falló al ejecutar {program}"))?;
+
+    if status.success() {
+        return Ok(());
+    }
+
+    bail!("{} {:?} devolvió código {}", program, args, status)
 }
 
 #[cfg(target_os = "macos")]

@@ -43,11 +43,14 @@ El binario expone estos subcomandos:
 - `zproxy stop`: detiene el daemon.
 - `zproxy service install`: instala el daemon como servicio de usuario (LaunchAgent en macOS, systemd --user en Linux).
 - `zproxy service start`: inicia el servicio instalado.
+- `zproxy service restart`: reinicia el servicio instalado.
 - `zproxy service status`: consulta estado del gestor de servicios (instalado/activo).
 - `zproxy service stop`: detiene el servicio instalado.
+- `zproxy service logs [--lines N] [--follow]`: muestra logs del servicio (tail/journalctl según plataforma).
 - `zproxy service uninstall`: desinstala el servicio de usuario.
 - `zproxy start`: si hay servicio instalado, lo inicia; si no, pregunta si quieres arrancar en modo detached.
 - `zproxy start --detached`: arranca `zproxy daemon` en background sin instalar servicio.
+- `zproxy logs [--lines N] [--follow] [--detached]`: muestra logs del servicio si está instalado; si no, hace tail de `zproxy.log` (modo detached).
 - `zproxy paths`: imprime rutas de config, estado, socket y pidfile.
 
 ## Resumen operativo

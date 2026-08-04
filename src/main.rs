@@ -34,6 +34,14 @@ enum Command {
         #[arg(long)]
         detached: bool,
     },
+    Logs {
+        #[arg(long, default_value_t = 100)]
+        lines: usize,
+        #[arg(long)]
+        follow: bool,
+        #[arg(long)]
+        detached: bool,
+    },
     Service {
         #[command(subcommand)]
         command: ServiceCommand,
@@ -45,8 +53,15 @@ enum Command {
 enum ServiceCommand {
     Install,
     Start,
+    Restart,
     Status,
     Stop,
+    Logs {
+        #[arg(long, default_value_t = 100)]
+        lines: usize,
+        #[arg(long)]
+        follow: bool,
+    },
     Uninstall,
 }
 
@@ -74,6 +89,11 @@ async fn main() -> Result<()> {
             run_control(paths.control_socket(), control::ControlCommand::Reload).await
         }
         Command::Start { detached } => run_start(paths, detached),
+        Command::Logs {
+            lines,
+            follow,
+            detached,
+        } => run_logs(paths, lines, follow, detached),
         Command::Service { command } => run_service(paths, command),
         Command::Paths => {
             println!("config: {}", paths.config_file.display());
@@ -132,12 +152,25 @@ fn run_start(paths: config::AppPaths, detached: bool) -> Result<()> {
     Ok(())
 }
 
+fn run_logs(paths: config::AppPaths, lines: usize, follow: bool, detached: bool) -> Result<()> {
+    if !detached && service::is_installed(&paths)? {
+        return service::logs(&paths, lines, follow);
+    }
+
+    service::tail_file(&paths.log_file(), lines, follow)
+}
+
 fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
     match command {
         ServiceCommand::Install => service::install(&paths),
         ServiceCommand::Start => {
             service::start(&paths)?;
             println!("servicio iniciado");
+            Ok(())
+        }
+        ServiceCommand::Restart => {
+            service::restart(&paths)?;
+            println!("servicio reiniciado");
             Ok(())
         }
         ServiceCommand::Status => {
@@ -150,6 +183,7 @@ fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
             println!("servicio detenido");
             Ok(())
         }
+        ServiceCommand::Logs { lines, follow } => service::logs(&paths, lines, follow),
         ServiceCommand::Uninstall => service::uninstall(&paths),
     }
 }
