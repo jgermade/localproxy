@@ -1,6 +1,6 @@
 use std::{
     fs,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
 };
 
@@ -125,6 +125,23 @@ impl Default for ListenConfig {
 impl ListenConfig {
     pub fn socket_addr(&self) -> SocketAddr {
         SocketAddr::new(self.host, self.port)
+    }
+
+    /// Proxy URL clients should use, e.g. `http://127.0.0.1:1234`.
+    ///
+    /// A wildcard bind address (`0.0.0.0` or `::`) is reachable through the loopback
+    /// interface, which is what a client on this machine has to connect to.
+    pub fn proxy_url(&self) -> String {
+        let host = match self.host {
+            IpAddr::V4(host) if host.is_unspecified() => IpAddr::V4(Ipv4Addr::LOCALHOST),
+            IpAddr::V6(host) if host.is_unspecified() => IpAddr::V6(Ipv6Addr::LOCALHOST),
+            host => host,
+        };
+
+        match host {
+            IpAddr::V4(host) => format!("http://{host}:{}", self.port),
+            IpAddr::V6(host) => format!("http://[{host}]:{}", self.port),
+        }
     }
 }
 

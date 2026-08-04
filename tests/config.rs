@@ -80,6 +80,47 @@ fn listen_config_supports_ipv6() {
 }
 
 #[test]
+fn the_proxy_url_follows_the_listen_address() {
+    assert_eq!(ListenConfig::default().proxy_url(), "http://127.0.0.1:1234");
+    assert_eq!(
+        ListenConfig {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            port: 8080,
+        }
+        .proxy_url(),
+        "http://10.0.0.5:8080"
+    );
+    assert_eq!(
+        ListenConfig {
+            host: IpAddr::V6(Ipv6Addr::LOCALHOST),
+            port: 1234,
+        }
+        .proxy_url(),
+        "http://[::1]:1234"
+    );
+}
+
+#[test]
+fn a_wildcard_listen_address_yields_a_loopback_url() {
+    assert_eq!(
+        ListenConfig {
+            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            port: 1234,
+        }
+        .proxy_url(),
+        "http://127.0.0.1:1234"
+    );
+    assert_eq!(
+        ListenConfig {
+            host: IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            port: 1234,
+        }
+        .proxy_url(),
+        "http://[::1]:1234"
+    );
+}
+
+#[test]
 fn empty_toml_falls_back_to_defaults() {
     let config: AppConfig = toml::from_str("").unwrap();
 

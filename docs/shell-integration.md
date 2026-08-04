@@ -4,11 +4,15 @@ localproxy does not touch the system network settings. Applications use it only 
 usually through the `http_proxy` / `https_proxy` environment variables. This page shows how to wire
 that into zsh and bash.
 
-Everything below assumes the default listen address `127.0.0.1:1234`. Check yours with:
+Everything below assumes the default listen address `127.0.0.1:1234`. Print the URL that matches
+your `config.toml` with:
 
 ```bash
-localproxy status
+localproxy url
 ```
+
+It reads `~/.config/localproxy/config.toml` and does not need the daemon to be running, so the
+snippets below can build the proxy URL instead of hardcoding host and port.
 
 ## Where to put the snippets
 
@@ -30,7 +34,7 @@ Simplest setup: export the variables unconditionally. Only do this if the daemon
 otherwise every tool will fail when localproxy is down.
 
 ```bash
-export LOCALPROXY_URL="http://127.0.0.1:1234"
+export LOCALPROXY_URL="$(localproxy url)"
 export http_proxy="$LOCALPROXY_URL"
 export https_proxy="$LOCALPROXY_URL"
 export HTTP_PROXY="$LOCALPROXY_URL"
@@ -53,7 +57,7 @@ export no_proxy="localhost,127.0.0.1,::1,.internal.example.com,192.168.0.0/16"
 Better default: keep the variables off and switch them on demand. Works in both zsh and bash.
 
 ```bash
-LOCALPROXY_URL="http://127.0.0.1:1234"
+LOCALPROXY_URL="$(localproxy url 2>/dev/null || echo http://127.0.0.1:1234)"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 proxy-on() {
@@ -95,9 +99,8 @@ Avoids polluting the shell environment:
 
 ```bash
 with-proxy() {
-  http_proxy="http://127.0.0.1:1234" https_proxy="http://127.0.0.1:1234" \
-  HTTP_PROXY="http://127.0.0.1:1234" HTTPS_PROXY="http://127.0.0.1:1234" \
-  "$@"
+  url="$(localproxy url)"
+  http_proxy="$url" https_proxy="$url" HTTP_PROXY="$url" HTTPS_PROXY="$url" "$@"
 }
 ```
 
@@ -112,7 +115,7 @@ Prevents a broken shell when localproxy is stopped. Add to `~/.zshrc` / `~/.bash
 
 ```bash
 if command -v localproxy > /dev/null 2>&1 && localproxy status > /dev/null 2>&1; then
-  export http_proxy="http://127.0.0.1:1234"
+  export http_proxy="$(localproxy url)"
   export https_proxy="$http_proxy"
   export HTTP_PROXY="$http_proxy"
   export HTTPS_PROXY="$http_proxy"

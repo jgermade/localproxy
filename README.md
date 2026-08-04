@@ -122,6 +122,7 @@ Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
 | `localproxy start --detached` | Start `localproxy daemon` in the background without registering a service. |
 | `localproxy logs [--lines N] [--follow] [--detached]` | Show logs from the service or the detached log file. |
 | `localproxy paths` | Print config, state, socket and pid file paths. |
+| `localproxy url` | Print the proxy URL built from the listen address in `config.toml`. |
 | `localproxy service install` | Register as a user-level service (LaunchAgent / systemd --user). |
 | `localproxy service start` | Start the registered service. |
 | `localproxy service restart` | Restart the registered service. |

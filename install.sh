@@ -247,10 +247,14 @@ write_block() {
     printf '\n%s\n' "$BLOCK_BEGIN"
     printf 'export PATH="%s:$PATH"\n\n' "$(portable_dir)"
     cat << 'LOCALPROXY_BLOCK'
-LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then
+  # The listen address lives in ~/.config/localproxy/config.toml, so the URL is read
+  # from there on every shell start instead of being hardcoded here.
+  LOCALPROXY_URL="$(localproxy url 2> /dev/null)"
+  : "${LOCALPROXY_URL:=http://127.0.0.1:1234}"
+
   # `localproxy status` talks to the control socket, so it only succeeds when the
   # daemon is really listening. Start it in the background otherwise.
   localproxy status > /dev/null 2>&1 || localproxy start --detached > /dev/null 2>&1

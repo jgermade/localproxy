@@ -42,6 +42,8 @@ pub enum Command {
         command: ServiceCommand,
     },
     Paths,
+    /// Prints the proxy URL built from the listen address in config.toml.
+    Url,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -88,6 +90,10 @@ pub async fn dispatch(command: Command, paths: config::AppPaths) -> Result<()> {
         Command::Service { command } => run_service(paths, command),
         Command::Paths => {
             print_paths(&paths);
+            Ok(())
+        }
+        Command::Url => {
+            println!("{}", config::load_or_create(&paths)?.listen.proxy_url());
             Ok(())
         }
     }
