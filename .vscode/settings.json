@@ -1,0 +1,12 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cargo init --bin --name zproxy \\.$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cargo check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
