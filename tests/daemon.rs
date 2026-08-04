@@ -2,12 +2,12 @@
 
 use std::fs;
 
-use zproxy::{app::PidGuard, config};
+use localproxy::{app::PidGuard, config};
 
 #[test]
 fn pid_guard_writes_the_pid_file_and_removes_it_on_drop() {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(dir.path());
+    let paths = localproxy::testing::paths(dir.path());
     paths.ensure_dirs().unwrap();
 
     let guard = PidGuard::acquire(&paths).unwrap();
@@ -23,7 +23,7 @@ fn pid_guard_writes_the_pid_file_and_removes_it_on_drop() {
 #[test]
 fn pid_guard_rejects_a_second_instance() {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(dir.path());
+    let paths = localproxy::testing::paths(dir.path());
     paths.ensure_dirs().unwrap();
 
     let _guard = PidGuard::acquire(&paths).unwrap();
@@ -35,7 +35,7 @@ fn pid_guard_rejects_a_second_instance() {
 #[test]
 fn pid_guard_can_be_reacquired_after_release() {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(dir.path());
+    let paths = localproxy::testing::paths(dir.path());
     paths.ensure_dirs().unwrap();
 
     drop(PidGuard::acquire(&paths).unwrap());
@@ -46,7 +46,7 @@ fn pid_guard_can_be_reacquired_after_release() {
 #[test]
 fn pid_guard_fails_when_the_state_dir_is_missing() {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(&dir.path().join("missing"));
+    let paths = localproxy::testing::paths(&dir.path().join("missing"));
 
     let error = PidGuard::acquire(&paths).unwrap_err();
 
@@ -56,8 +56,8 @@ fn pid_guard_fails_when_the_state_dir_is_missing() {
 #[tokio::test]
 async fn a_fresh_state_has_no_gateway_and_is_not_cancelled() {
     let dir = tempfile::tempdir().unwrap();
-    let state = zproxy::testing::state(
-        zproxy::testing::paths(dir.path()),
+    let state = localproxy::testing::state(
+        localproxy::testing::paths(dir.path()),
         config::AppConfig::default(),
     );
 

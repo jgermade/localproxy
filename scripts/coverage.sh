@@ -98,7 +98,7 @@ for binary in "${binaries[@]}"; do
   LLVM_PROFILE_FILE="$PWD/$out_dir/$(basename "$binary")-%p-%m.profraw" "$binary" --quiet
 done
 
-"$profdata" merge -sparse "$out_dir"/*.profraw -o "$out_dir/zproxy.profdata"
+"$profdata" merge -sparse "$out_dir"/*.profraw -o "$out_dir/localproxy.profdata"
 
 objects=()
 for binary in "${binaries[@]}"; do
@@ -106,12 +106,12 @@ for binary in "${binaries[@]}"; do
 done
 
 "$cov" report "${objects[@]}" \
-  --instr-profile="$out_dir/zproxy.profdata" \
+  --instr-profile="$out_dir/localproxy.profdata" \
   --ignore-filename-regex="$ignore"
 
 if [ "$html" -eq 1 ]; then
   "$cov" show "${objects[@]}" \
-    --instr-profile="$out_dir/zproxy.profdata" \
+    --instr-profile="$out_dir/localproxy.profdata" \
     --ignore-filename-regex="$ignore" \
     --format=html \
     --output-dir="$out_dir/html"
@@ -120,7 +120,7 @@ fi
 
 if [ -n "$fail_under" ]; then
   "$cov" export "${objects[@]}" \
-    --instr-profile="$out_dir/zproxy.profdata" \
+    --instr-profile="$out_dir/localproxy.profdata" \
     --ignore-filename-regex="$ignore" \
     --summary-only > "$out_dir/summary.json"
 

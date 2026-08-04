@@ -6,14 +6,14 @@ use std::{
     path::Path,
 };
 
-use zproxy::config::{
+use localproxy::config::{
     AppConfig, AppPaths, FallbackConfig, ListenConfig, ProxyProtocol, SavedProxy, UpstreamConfig,
     fallback_allows_direct, gateway_poll_interval_secs, load_or_create, resolve_fallback_endpoint,
     resolve_upstream_endpoint, save, summarize,
 };
 
 fn paths_in(dir: &Path) -> AppPaths {
-    zproxy::testing::paths(dir)
+    localproxy::testing::paths(dir)
 }
 
 fn static_proxy(name: &str, protocol: ProxyProtocol) -> SavedProxy {
@@ -28,12 +28,15 @@ fn static_proxy(name: &str, protocol: ProxyProtocol) -> SavedProxy {
 
 #[test]
 fn app_paths_derive_runtime_files_from_state_dir() {
-    let paths = paths_in(Path::new("/tmp/zproxy-test"));
+    let paths = paths_in(Path::new("/tmp/localproxy-test"));
 
-    assert_eq!(paths.control_socket(), paths.state_dir.join("zproxy.sock"));
-    assert_eq!(paths.pid_file(), paths.state_dir.join("zproxy.pid"));
-    assert_eq!(paths.lock_file(), paths.state_dir.join("zproxy.lock"));
-    assert_eq!(paths.log_file(), paths.state_dir.join("zproxy.log"));
+    assert_eq!(
+        paths.control_socket(),
+        paths.state_dir.join("localproxy.sock")
+    );
+    assert_eq!(paths.pid_file(), paths.state_dir.join("localproxy.pid"));
+    assert_eq!(paths.lock_file(), paths.state_dir.join("localproxy.lock"));
+    assert_eq!(paths.log_file(), paths.state_dir.join("localproxy.log"));
 }
 
 #[test]

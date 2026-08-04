@@ -1,11 +1,11 @@
 [package]
-name = "zproxy"
+name = "localproxy"
 version = "0.1.2"
 edition = "2024"
 description = "Local proxy daemon that forwards HTTP and HTTPS traffic through a configurable upstream chain"
 license = "MIT"
-repository = "https://github.com/jgermade/zproxy"
-homepage = "https://github.com/jgermade/zproxy"
+repository = "https://github.com/jgermade/localproxy"
+homepage = "https://github.com/jgermade/localproxy"
 readme = "README.md"
 keywords = ["proxy", "http", "socks5", "daemon", "cli"]
 categories = ["command-line-utilities", "network-programming"]

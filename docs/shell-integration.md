@@ -1,13 +1,13 @@
 # Shell integration (zsh / bash)
 
-zproxy does not touch the system network settings. Applications use it only when they are told to,
+localproxy does not touch the system network settings. Applications use it only when they are told to,
 usually through the `http_proxy` / `https_proxy` environment variables. This page shows how to wire
 that into zsh and bash.
 
 Everything below assumes the default listen address `127.0.0.1:8888`. Check yours with:
 
 ```bash
-zproxy status
+localproxy status
 ```
 
 ## Where to put the snippets
@@ -27,14 +27,14 @@ source ~/.zshrc     # or ~/.bashrc
 ## Always-on proxy variables
 
 Simplest setup: export the variables unconditionally. Only do this if the daemon runs as a service,
-otherwise every tool will fail when zproxy is down.
+otherwise every tool will fail when localproxy is down.
 
 ```bash
-export ZPROXY_URL="http://127.0.0.1:8888"
-export http_proxy="$ZPROXY_URL"
-export https_proxy="$ZPROXY_URL"
-export HTTP_PROXY="$ZPROXY_URL"
-export HTTPS_PROXY="$ZPROXY_URL"
+export LOCALPROXY_URL="http://127.0.0.1:8888"
+export http_proxy="$LOCALPROXY_URL"
+export https_proxy="$LOCALPROXY_URL"
+export HTTP_PROXY="$LOCALPROXY_URL"
+export HTTPS_PROXY="$LOCALPROXY_URL"
 export no_proxy="localhost,127.0.0.1,::1"
 export NO_PROXY="$no_proxy"
 ```
@@ -53,14 +53,14 @@ export no_proxy="localhost,127.0.0.1,::1,.internal.example.com,192.168.0.0/16"
 Better default: keep the variables off and switch them on demand. Works in both zsh and bash.
 
 ```bash
-ZPROXY_URL="http://127.0.0.1:8888"
-ZPROXY_NO_PROXY="localhost,127.0.0.1,::1"
+LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 proxy-on() {
-  export http_proxy="$ZPROXY_URL" https_proxy="$ZPROXY_URL"
-  export HTTP_PROXY="$ZPROXY_URL" HTTPS_PROXY="$ZPROXY_URL"
-  export no_proxy="$ZPROXY_NO_PROXY" NO_PROXY="$ZPROXY_NO_PROXY"
-  echo "proxy on -> $ZPROXY_URL"
+  export http_proxy="$LOCALPROXY_URL" https_proxy="$LOCALPROXY_URL"
+  export HTTP_PROXY="$LOCALPROXY_URL" HTTPS_PROXY="$LOCALPROXY_URL"
+  export no_proxy="$LOCALPROXY_NO_PROXY" NO_PROXY="$LOCALPROXY_NO_PROXY"
+  echo "proxy on -> $LOCALPROXY_URL"
 }
 
 proxy-off() {
@@ -74,7 +74,7 @@ proxy-status() {
   else
     echo "proxy off"
   fi
-  zproxy status 2>/dev/null || echo "daemon not running"
+  localproxy status 2>/dev/null || echo "daemon not running"
 }
 ```
 
@@ -108,10 +108,10 @@ with-proxy npm install
 
 ## Enable only when the daemon is listening
 
-Prevents a broken shell when zproxy is stopped. Add to `~/.zshrc` / `~/.bashrc`:
+Prevents a broken shell when localproxy is stopped. Add to `~/.zshrc` / `~/.bashrc`:
 
 ```bash
-if command -v zproxy > /dev/null 2>&1 && zproxy status > /dev/null 2>&1; then
+if command -v localproxy > /dev/null 2>&1 && localproxy status > /dev/null 2>&1; then
   export http_proxy="http://127.0.0.1:8888"
   export https_proxy="$http_proxy"
   export HTTP_PROXY="$http_proxy"
@@ -121,7 +121,7 @@ if command -v zproxy > /dev/null 2>&1 && zproxy status > /dev/null 2>&1; then
 fi
 ```
 
-`zproxy status` talks to the control socket, so it succeeds only when the daemon is actually
+`localproxy status` talks to the control socket, so it succeeds only when the daemon is actually
 running. It adds a few milliseconds to shell startup; use the toggle functions instead if that
 matters.
 
@@ -130,14 +130,14 @@ matters.
 If you do not want a registered service, start it on demand:
 
 ```bash
-zproxy-up() {
-  zproxy status > /dev/null 2>&1 || zproxy start --detached
+localproxy-up() {
+  localproxy status > /dev/null 2>&1 || localproxy start --detached
   proxy-on
 }
 
-zproxy-down() {
+localproxy-down() {
   proxy-off
-  zproxy stop > /dev/null 2>&1
+  localproxy stop > /dev/null 2>&1
 }
 ```
 
@@ -145,17 +145,17 @@ For an always-running daemon, prefer the service (see
 [operations.md](operations.md)):
 
 ```bash
-zproxy service install
-zproxy start
+localproxy service install
+localproxy start
 ```
 
 ## Useful aliases
 
 ```bash
-alias zpstatus='zproxy status'
-alias zplogs='zproxy logs --follow'
-alias zpconfig='zproxy config'
-alias zprestart='zproxy service restart'
+alias zpstatus='localproxy status'
+alias zplogs='localproxy logs --follow'
+alias zpconfig='localproxy config'
+alias zprestart='localproxy service restart'
 ```
 
 ## Tools that ignore the environment variables
@@ -189,10 +189,10 @@ Host github.com
 ```bash
 env | grep -i proxy
 curl -v http://example.com 2>&1 | head -5     # should show the proxy connection
-zproxy logs --lines 20
+localproxy logs --lines 20
 ```
 
-If a request does not go through zproxy, the usual causes are:
+If a request does not go through localproxy, the usual causes are:
 
 - The variables are exported in a subshell only.
 - The host matches `no_proxy`.

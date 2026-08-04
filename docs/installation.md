@@ -1,6 +1,6 @@
 # Installation
 
-zproxy ships prebuilt binaries with every GitHub Release. Downloading one of those assets is the
+localproxy ships prebuilt binaries with every GitHub Release. Downloading one of those assets is the
 recommended way to install; building from source is only needed for development.
 
 ## Release assets
@@ -9,13 +9,13 @@ Each release publishes one static asset per platform:
 
 | Asset | Platform |
 |---|---|
-| `zproxy-macos-aarch64` | macOS on Apple Silicon (M1/M2/M3/M4) |
-| `zproxy-macos-x86_64` | macOS on Intel |
-| `zproxy-linux-x86_64` | Linux on x86_64 |
-| `zproxy-linux-aarch64` | Linux on arm64 |
+| `localproxy-macos-aarch64` | macOS on Apple Silicon (M1/M2/M3/M4) |
+| `localproxy-macos-x86_64` | macOS on Intel |
+| `localproxy-linux-x86_64` | Linux on x86_64 |
+| `localproxy-linux-aarch64` | Linux on arm64 |
 
 They are plain executables — no archive, no installer. Releases live at
-<https://github.com/jgermade/zproxy/releases>.
+<https://github.com/jgermade/localproxy/releases>.
 
 Identify your platform if you are unsure:
 
@@ -30,35 +30,35 @@ uname -m        # arm64 / aarch64 | x86_64
 `~/.local/bin` and adds the proxy block to your shell profile:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
 ```
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
 ```
 
 Options are passed after `-s --`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh \
   | bash -s -- --version v0.1.1 --dir /usr/local/bin --no-modify-profile
 ```
 
 | Option | Environment variable | Default |
 |---|---|---|
-| `--version <vX.Y.Z>` | `ZPROXY_VERSION` | latest release |
-| `--dir <path>` | `ZPROXY_INSTALL_DIR` | `~/.local/bin` |
-| `--profile <path>` | `ZPROXY_PROFILE` | `~/.zshrc`, `~/.bashrc` or `~/.bash_profile` |
-| `--no-modify-profile` | `ZPROXY_NO_MODIFY_PROFILE` | profile is updated |
-| — | `GITHUB_TOKEN` / `ZPROXY_GITHUB_TOKEN` | unset (only needed for private forks or to avoid API rate limits) |
+| `--version <vX.Y.Z>` | `LOCALPROXY_VERSION` | latest release |
+| `--dir <path>` | `LOCALPROXY_INSTALL_DIR` | `~/.local/bin` |
+| `--profile <path>` | `LOCALPROXY_PROFILE` | `~/.zshrc`, `~/.bashrc` or `~/.bash_profile` |
+| `--no-modify-profile` | `LOCALPROXY_NO_MODIFY_PROFILE` | profile is updated |
+| — | `GITHUB_TOKEN` / `LOCALPROXY_GITHUB_TOKEN` | unset (only needed for private forks or to avoid API rate limits) |
 
 Behaviour worth knowing:
 
 - The binary is staged inside the install directory and moved into place with an atomic rename, so
-  upgrading works while an older zproxy is still running.
+  upgrading works while an older localproxy is still running.
 - The macOS quarantine attribute is cleared automatically.
-- The downloaded binary is executed once (`zproxy --version`) before being installed.
-- The shell profile is only touched when the `# --- zproxy ---` marker is missing, so re-running the
+- The downloaded binary is executed once (`localproxy --version`) before being installed.
+- The shell profile is only touched when the `# --- localproxy ---` marker is missing, so re-running the
   installer never duplicates the block.
 - Re-run the same command to upgrade.
 
@@ -86,11 +86,11 @@ case "$arch" in
   *) echo "unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
-asset="zproxy-${os_tag}-${arch_tag}"
+asset="localproxy-${os_tag}-${arch_tag}"
 mkdir -p ~/.local/bin
-curl -fsSL -o ~/.local/bin/zproxy \
-  "https://github.com/jgermade/zproxy/releases/latest/download/${asset}"
-chmod +x ~/.local/bin/zproxy
+curl -fsSL -o ~/.local/bin/localproxy \
+  "https://github.com/jgermade/localproxy/releases/latest/download/${asset}"
+chmod +x ~/.local/bin/localproxy
 ```
 
 Make sure `~/.local/bin` is on your `PATH`:
@@ -106,8 +106,8 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 Verify:
 
 ```bash
-zproxy --version
-zproxy paths
+localproxy --version
+localproxy paths
 ```
 
 ## Install a specific version
@@ -115,9 +115,9 @@ zproxy paths
 Replace `latest/download` with `download/<tag>`:
 
 ```bash
-curl -fsSL -o ~/.local/bin/zproxy \
-  https://github.com/jgermade/zproxy/releases/download/v0.1.0/zproxy-macos-aarch64
-chmod +x ~/.local/bin/zproxy
+curl -fsSL -o ~/.local/bin/localproxy \
+  https://github.com/jgermade/localproxy/releases/download/v0.1.0/localproxy-macos-aarch64
+chmod +x ~/.local/bin/localproxy
 ```
 
 ## macOS: clear the quarantine flag
@@ -126,7 +126,7 @@ Binaries downloaded with a browser get the `com.apple.quarantine` attribute and 
 to run them. The release binaries are not notarised, so remove the attribute manually:
 
 ```bash
-xattr -d com.apple.quarantine ~/.local/bin/zproxy
+xattr -d com.apple.quarantine ~/.local/bin/localproxy
 ```
 
 `curl` does not set the quarantine flag, so this step is only needed when downloading from Safari or
@@ -138,10 +138,10 @@ Chrome. If macOS still blocks the binary, allow it once from
 Install into `/usr/local/bin` instead of `~/.local/bin` if you want it available for every user:
 
 ```bash
-sudo install -m 0755 ~/Downloads/zproxy-macos-aarch64 /usr/local/bin/zproxy
+sudo install -m 0755 ~/Downloads/localproxy-macos-aarch64 /usr/local/bin/localproxy
 ```
 
-Note that `zproxy service install` always registers a **user-level** service (LaunchAgent or
+Note that `localproxy service install` always registers a **user-level** service (LaunchAgent or
 `systemd --user`), regardless of where the binary lives.
 
 ## Register the service
@@ -150,17 +150,17 @@ The service definition stores the absolute path of the binary that ran `service 
 the binary to its final location **before** registering the service:
 
 ```bash
-zproxy config           # create the configuration
-zproxy service install  # register the user-level service
-zproxy start            # start it
-zproxy status           # verify
+localproxy config           # create the configuration
+localproxy service install  # register the user-level service
+localproxy start            # start it
+localproxy status           # verify
 ```
 
 If you later move or replace the binary, re-register it:
 
 ```bash
-zproxy service uninstall
-zproxy service install
+localproxy service uninstall
+localproxy service install
 ```
 
 ## Upgrade
@@ -168,11 +168,11 @@ zproxy service install
 Download the new asset over the existing binary and restart the service:
 
 ```bash
-zproxy stop
-curl -fsSL -o ~/.local/bin/zproxy \
-  https://github.com/jgermade/zproxy/releases/latest/download/zproxy-macos-aarch64
-chmod +x ~/.local/bin/zproxy
-zproxy start
+localproxy stop
+curl -fsSL -o ~/.local/bin/localproxy \
+  https://github.com/jgermade/localproxy/releases/latest/download/localproxy-macos-aarch64
+chmod +x ~/.local/bin/localproxy
+localproxy start
 ```
 
 The binary path does not change, so the service definition stays valid.
@@ -180,10 +180,10 @@ The binary path does not change, so the service definition stays valid.
 ## Uninstall
 
 ```bash
-zproxy service uninstall          # remove the LaunchAgent / systemd unit
-rm ~/.local/bin/zproxy            # remove the binary
-rm -rf ~/.local/state/zproxy      # remove runtime state and logs
-rm -rf ~/.config/zproxy           # remove the configuration
+localproxy service uninstall          # remove the LaunchAgent / systemd unit
+rm ~/.local/bin/localproxy            # remove the binary
+rm -rf ~/.local/state/localproxy      # remove runtime state and logs
+rm -rf ~/.config/localproxy           # remove the configuration
 ```
 
 ## Build from source
@@ -191,13 +191,13 @@ rm -rf ~/.config/zproxy           # remove the configuration
 Only needed for development or unsupported platforms:
 
 ```bash
-git clone https://github.com/jgermade/zproxy.git
-cd zproxy
+git clone https://github.com/jgermade/localproxy.git
+cd localproxy
 cargo build --release
-install -m 0755 target/release/zproxy ~/.local/bin/zproxy
+install -m 0755 target/release/localproxy ~/.local/bin/localproxy
 ```
 
-Do not point the service at `target/release/zproxy` inside the checkout: `cargo clean` or a rebuild
+Do not point the service at `target/release/localproxy` inside the checkout: `cargo clean` or a rebuild
 would leave the service with a broken or half-written executable.
 
 ## Next steps

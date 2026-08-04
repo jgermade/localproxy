@@ -2,27 +2,27 @@
 
 ## Daemon modes
 
-zproxy can run in three modes:
+localproxy can run in three modes:
 
 | Mode | Command | Description |
 |---|---|---|
-| Foreground | `zproxy daemon` | Runs in the terminal; exits when the terminal closes. |
-| Detached | `zproxy start --detached` | Spawns the daemon in the background; stdout/stderr go to `zproxy.log`. |
-| Service | `zproxy service install && zproxy start` | Registers a user-level service managed by launchd (macOS) or systemd (Linux). |
+| Foreground | `localproxy daemon` | Runs in the terminal; exits when the terminal closes. |
+| Detached | `localproxy start --detached` | Spawns the daemon in the background; stdout/stderr go to `localproxy.log`. |
+| Service | `localproxy service install && localproxy start` | Registers a user-level service managed by launchd (macOS) or systemd (Linux). |
 
 ## Service management
 
 ### Install and start
 
 ```bash
-zproxy service install
-zproxy start            # starts the service (or asks to run detached if not installed)
+localproxy service install
+localproxy start            # starts the service (or asks to run detached if not installed)
 ```
 
 ### Status
 
 ```bash
-zproxy service status
+localproxy service status
 ```
 
 Example output:
@@ -34,28 +34,28 @@ installed=true running=true state=running
 ### Restart
 
 ```bash
-zproxy service restart
+localproxy service restart
 ```
 
 ### Stop
 
 ```bash
-zproxy service stop
+localproxy service stop
 ```
 
 ### Uninstall
 
 ```bash
-zproxy service uninstall
+localproxy service uninstall
 ```
 
-## `zproxy start` behaviour
+## `localproxy start` behaviour
 
 1. If a service is installed → runs `service start`.
 2. Otherwise → prompts before doing anything:
 
 ```console
-$ zproxy start
+$ localproxy start
 No service installed. Do you want to run start --detached? [Y/n] y
 daemon started in background with pid 41822
 ```
@@ -63,23 +63,23 @@ daemon started in background with pid 41822
 Declining leaves the system untouched:
 
 ```console
-$ zproxy start
+$ localproxy start
 No service installed. Do you want to run start --detached? [Y/n] n
 cancelled
 ```
 
-Use `zproxy start --detached` to bypass the prompt and always start detached.
+Use `localproxy start --detached` to bypass the prompt and always start detached.
 
 ## Runtime state on disk
 
-All runtime files live under `~/.local/state/zproxy`:
+All runtime files live under `~/.local/state/localproxy`:
 
 | File | Purpose |
 |---|---|
-| `zproxy.pid` | PID of the running instance. |
-| `zproxy.lock` | Exclusive lock; prevents multiple instances. |
-| `zproxy.sock` | Unix control socket. |
-| `zproxy.log` | stdout/stderr from detached mode. |
+| `localproxy.pid` | PID of the running instance. |
+| `localproxy.lock` | Exclusive lock; prevents multiple instances. |
+| `localproxy.sock` | Unix control socket. |
+| `localproxy.log` | stdout/stderr from detached mode. |
 
 ## Control socket
 
@@ -94,12 +94,12 @@ The Unix socket accepts one command per line:
 The CLI wraps these for you:
 
 ```bash
-zproxy status
-zproxy reload
-zproxy stop
+localproxy status
+localproxy reload
+localproxy stop
 ```
 
-## `zproxy status` output
+## `localproxy status` output
 
 ```text
 listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
@@ -109,10 +109,10 @@ Fields: `listen`, `upstream`, `fallback`, `gateway` (current detected IP, or `un
 
 ## Configuration and hot-reload
 
-`zproxy config` opens the wizard, saves the file, and immediately sends `reload` to the daemon if it is running:
+`localproxy config` opens the wizard, saves the file, and immediately sends `reload` to the daemon if it is running:
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · none
@@ -129,19 +129,19 @@ config saved; daemon not notified: No such file or directory (os error 2)
 To reload without the wizard:
 
 ```bash
-zproxy reload
+localproxy reload
 ```
 
 Reload replaces the in-memory config; in-flight connections continue with the old config, new connections use the new one.
 
-See [configuration.md](configuration.md) for the complete `zproxy config` prompt reference and session examples.
+See [configuration.md](configuration.md) for the complete `localproxy config` prompt reference and session examples.
 
-### Common `zproxy config` operations
+### Common `localproxy config` operations
 
 **Switch from direct to gateway upstream while the daemon is running:**
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · gateway
@@ -155,7 +155,7 @@ reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gatew
 **Disable the upstream temporarily (go direct):**
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · none
@@ -166,7 +166,7 @@ reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 **Point to a static SOCKS5 proxy:**
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · static
@@ -180,14 +180,14 @@ reloaded: listen=127.0.0.1:8888 upstream=static:socks5:127.0.0.1:1080 fallback=n
 **Change the listen port** — the config is reloaded but the listener stays on the old port until the daemon restarts:
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 9999
 ✔ Upstream type · none
 ✔ Fallback type · direct
 reloaded: listen=127.0.0.1:9999 upstream=none fallback=direct gateway=unknown
 
-$ zproxy service restart      # or: zproxy stop && zproxy start
+$ localproxy service restart      # or: localproxy stop && localproxy start
 service restarted
 ```
 
@@ -212,12 +212,12 @@ ip route show default
 
 ## Logging
 
-The binary uses `tracing`. Default level: `info,zproxy=debug`. Override with `RUST_LOG`:
+The binary uses `tracing`. Default level: `info,localproxy=debug`. Override with `RUST_LOG`:
 
 ```bash
-RUST_LOG=debug zproxy daemon
-RUST_LOG=trace zproxy daemon
-RUST_LOG=warn  zproxy daemon
+RUST_LOG=debug localproxy daemon
+RUST_LOG=trace localproxy daemon
+RUST_LOG=warn  localproxy daemon
 ```
 
 ### View logs
@@ -225,25 +225,25 @@ RUST_LOG=warn  zproxy daemon
 Service logs (uses the OS service manager):
 
 ```bash
-zproxy service logs
-zproxy service logs --lines 200
-zproxy service logs --follow
+localproxy service logs
+localproxy service logs --lines 200
+localproxy service logs --follow
 ```
 
 Universal logs (service if installed, detached log file otherwise):
 
 ```bash
-zproxy logs
-zproxy logs --follow
-zproxy logs --lines 50
-zproxy logs --detached      # force the zproxy.log file even if a service is installed
+localproxy logs
+localproxy logs --follow
+localproxy logs --lines 50
+localproxy logs --detached      # force the localproxy.log file even if a service is installed
 ```
 
 Platform details:
 
-- **macOS**: tails `launchd.out.log` and `launchd.err.log` in `~/.local/state/zproxy`.
-- **Linux**: uses `journalctl --user -u zproxy.service`.
-- **Detached mode**: `~/.local/state/zproxy/zproxy.log` (stdout + stderr of the spawned process).
+- **macOS**: tails `launchd.out.log` and `launchd.err.log` in `~/.local/state/localproxy`.
+- **Linux**: uses `journalctl --user -u localproxy.service`.
+- **Detached mode**: `~/.local/state/localproxy/localproxy.log` (stdout + stderr of the spawned process).
 
 ## Troubleshooting
 
@@ -252,15 +252,15 @@ Platform details:
 The lock file is exclusive. Check whether the process is still alive:
 
 ```bash
-cat ~/.local/state/zproxy/zproxy.pid
-ps aux | grep zproxy
+cat ~/.local/state/localproxy/localproxy.pid
+ps aux | grep localproxy
 ```
 
 If the process is gone (stale lock after a crash), remove runtime files:
 
 ```bash
-rm ~/.local/state/zproxy/zproxy.{pid,lock,sock}
-zproxy start
+rm ~/.local/state/localproxy/localproxy.{pid,lock,sock}
+localproxy start
 ```
 
 ### `status` or `reload` can't connect to the socket
@@ -274,7 +274,7 @@ Likely causes:
 Check expected paths:
 
 ```bash
-zproxy paths
+localproxy paths
 ```
 
 ### Gateway upstream never resolves

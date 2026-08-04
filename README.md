@@ -1,6 +1,6 @@
-# zproxy
+# localproxy
 
-zproxy is a local proxy daemon written in Rust. It listens on localhost and forwards HTTP and HTTPS traffic through a configurable resolution chain:
+localproxy is a local proxy daemon written in Rust. It listens on localhost and forwards HTTP and HTTPS traffic through a configurable resolution chain:
 
 1. optional primary upstream
 2. optional fallback
@@ -31,61 +31,61 @@ One line, like nvm or oh-my-zsh — detects your platform, installs into `~/.loc
 your shell profile:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
 ```
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
 ```
 
 Options go after `-s --` (`--version`, `--dir`, `--profile`, `--no-modify-profile`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh \
   | bash -s -- --dir /usr/local/bin --no-modify-profile
 ```
 
 Re-run the same command to upgrade. Prefer doing it by hand? Download the binary for your platform
-from the [latest release](https://github.com/jgermade/zproxy/releases/latest):
+from the [latest release](https://github.com/jgermade/localproxy/releases/latest):
 
 ```bash
 # macOS (Apple Silicon)
-curl -fsSL -o ~/.local/bin/zproxy \
-  https://github.com/jgermade/zproxy/releases/latest/download/zproxy-macos-aarch64
-chmod +x ~/.local/bin/zproxy
+curl -fsSL -o ~/.local/bin/localproxy \
+  https://github.com/jgermade/localproxy/releases/latest/download/localproxy-macos-aarch64
+chmod +x ~/.local/bin/localproxy
 ```
 
-Available assets: `zproxy-macos-aarch64`, `zproxy-macos-x86_64`, `zproxy-linux-x86_64`,
-`zproxy-linux-aarch64`. See [docs/installation.md](docs/installation.md) for platform detection,
+Available assets: `localproxy-macos-aarch64`, `localproxy-macos-x86_64`, `localproxy-linux-x86_64`,
+`localproxy-linux-aarch64`. See [docs/installation.md](docs/installation.md) for platform detection,
 Gatekeeper notes, upgrades and uninstall.
 
 ## Shell setup (zsh / bash)
 
-zproxy does not change the system network settings: tools pick it up through the `http_proxy` /
+localproxy does not change the system network settings: tools pick it up through the `http_proxy` /
 `https_proxy` environment variables. The installer adds the block below for you; add it by hand to
 `~/.zshrc` (zsh) or `~/.bashrc` / `~/.bash_profile` (bash) if you used `--no-modify-profile`. It
 starts the daemon when it is not running and exports the variables:
 
 ```bash
-# --- zproxy ---------------------------------------------------------------
+# --- localproxy -----------------------------------------------------------
 export PATH="$HOME/.local/bin:$PATH"
 
-ZPROXY_URL="http://127.0.0.1:8888"
-ZPROXY_NO_PROXY="localhost,127.0.0.1,::1"
+LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
-if command -v zproxy > /dev/null 2>&1; then
-  # `zproxy status` talks to the control socket, so it only succeeds when the
+if command -v localproxy > /dev/null 2>&1; then
+  # `localproxy status` talks to the control socket, so it only succeeds when the
   # daemon is really listening. Start it in the background otherwise.
-  zproxy status > /dev/null 2>&1 || zproxy start --detached > /dev/null 2>&1
+  localproxy status > /dev/null 2>&1 || localproxy start --detached > /dev/null 2>&1
 
-  export http_proxy="$ZPROXY_URL"
-  export https_proxy="$ZPROXY_URL"
-  export all_proxy="$ZPROXY_URL"
-  export HTTP_PROXY="$ZPROXY_URL"
-  export HTTPS_PROXY="$ZPROXY_URL"
-  export ALL_PROXY="$ZPROXY_URL"
-  export no_proxy="$ZPROXY_NO_PROXY"
-  export NO_PROXY="$ZPROXY_NO_PROXY"
+  export http_proxy="$LOCALPROXY_URL"
+  export https_proxy="$LOCALPROXY_URL"
+  export all_proxy="$LOCALPROXY_URL"
+  export HTTP_PROXY="$LOCALPROXY_URL"
+  export HTTPS_PROXY="$LOCALPROXY_URL"
+  export ALL_PROXY="$LOCALPROXY_URL"
+  export no_proxy="$LOCALPROXY_NO_PROXY"
+  export NO_PROXY="$LOCALPROXY_NO_PROXY"
 fi
 # --------------------------------------------------------------------------
 ```
@@ -94,11 +94,11 @@ Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
 
 - Both cases are exported on purpose: `curl` and most Unix tools read the lowercase names, while
   many language runtimes read the uppercase ones.
-- If you registered the service (`zproxy service install`), replace `zproxy start --detached` with
-  `zproxy service start`.
-- Extend `ZPROXY_NO_PROXY` with the hosts that must bypass the proxy, e.g.
+- If you registered the service (`localproxy service install`), replace `localproxy start --detached` with
+  `localproxy service start`.
+- Extend `LOCALPROXY_NO_PROXY` with the hosts that must bypass the proxy, e.g.
   `"localhost,127.0.0.1,::1,.internal.example.com,192.168.0.0/16"`.
-- The `zproxy status` probe adds a few milliseconds to every shell start; use the `proxy-on` /
+- The `localproxy status` probe adds a few milliseconds to every shell start; use the `proxy-on` /
   `proxy-off` toggle functions from [docs/shell-integration.md](docs/shell-integration.md) if you
   prefer to opt in per session.
 
@@ -116,33 +116,33 @@ Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
 
 | Command | Description |
 |---|---|
-| `zproxy daemon` | Start the daemon and the proxy listener in the foreground. |
-| `zproxy config` | Open the interactive wizard, save config and hot-reload the daemon. |
-| `zproxy status` | Query the running daemon via the Unix control socket. |
-| `zproxy reload` | Reload config from disk without restarting the process. |
-| `zproxy stop` | Stop the daemon. |
-| `zproxy start` | Start the service if installed; otherwise ask to run detached. |
-| `zproxy start --detached` | Start `zproxy daemon` in the background without registering a service. |
-| `zproxy logs [--lines N] [--follow] [--detached]` | Show logs from the service or the detached log file. |
-| `zproxy paths` | Print config, state, socket and pid file paths. |
-| `zproxy service install` | Register as a user-level service (LaunchAgent / systemd --user). |
-| `zproxy service start` | Start the registered service. |
-| `zproxy service restart` | Restart the registered service. |
-| `zproxy service status` | Query the service manager (installed / running state). |
-| `zproxy service stop` | Stop the registered service. |
-| `zproxy service logs [--lines N] [--follow]` | Show service logs (tail/journalctl). |
-| `zproxy service uninstall` | Unregister the user-level service. |
+| `localproxy daemon` | Start the daemon and the proxy listener in the foreground. |
+| `localproxy config` | Open the interactive wizard, save config and hot-reload the daemon. |
+| `localproxy status` | Query the running daemon via the Unix control socket. |
+| `localproxy reload` | Reload config from disk without restarting the process. |
+| `localproxy stop` | Stop the daemon. |
+| `localproxy start` | Start the service if installed; otherwise ask to run detached. |
+| `localproxy start --detached` | Start `localproxy daemon` in the background without registering a service. |
+| `localproxy logs [--lines N] [--follow] [--detached]` | Show logs from the service or the detached log file. |
+| `localproxy paths` | Print config, state, socket and pid file paths. |
+| `localproxy service install` | Register as a user-level service (LaunchAgent / systemd --user). |
+| `localproxy service start` | Start the registered service. |
+| `localproxy service restart` | Restart the registered service. |
+| `localproxy service status` | Query the service manager (installed / running state). |
+| `localproxy service stop` | Stop the registered service. |
+| `localproxy service logs [--lines N] [--follow]` | Show service logs (tail/journalctl). |
+| `localproxy service uninstall` | Unregister the user-level service. |
 
 ## Default paths
 
 | Purpose | Path |
 |---|---|
-| Configuration | `~/.config/zproxy/config.toml` |
-| State directory | `~/.local/state/zproxy` |
-| Control socket | `~/.local/state/zproxy/zproxy.sock` |
-| PID file | `~/.local/state/zproxy/zproxy.pid` |
-| Lock file | `~/.local/state/zproxy/zproxy.lock` |
-| Log file (detached) | `~/.local/state/zproxy/zproxy.log` |
+| Configuration | `~/.config/localproxy/config.toml` |
+| State directory | `~/.local/state/localproxy` |
+| Control socket | `~/.local/state/localproxy/localproxy.sock` |
+| PID file | `~/.local/state/localproxy/localproxy.pid` |
+| Lock file | `~/.local/state/localproxy/localproxy.lock` |
+| Log file (detached) | `~/.local/state/localproxy/localproxy.log` |
 
 ## Development
 

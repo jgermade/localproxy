@@ -2,21 +2,21 @@
 
 use std::{path::PathBuf, time::Duration};
 
+use localproxy::{
+    app::SharedState,
+    config,
+    control::{ControlCommand, send_command, serve},
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
     time::timeout,
 };
-use zproxy::{
-    app::SharedState,
-    config,
-    control::{ControlCommand, send_command, serve},
-};
 
 async fn spawn_server(dir: &std::path::Path) -> (SharedState, PathBuf) {
-    let paths = zproxy::testing::paths(dir);
+    let paths = localproxy::testing::paths(dir);
     paths.ensure_dirs().unwrap();
-    let state = zproxy::testing::state(paths.clone(), config::AppConfig::default());
+    let state = localproxy::testing::state(paths.clone(), config::AppConfig::default());
     let socket_path = paths.control_socket();
 
     let server_state = state.clone();
@@ -146,7 +146,7 @@ async fn unknown_commands_close_the_connection_without_a_response() {
 #[tokio::test]
 async fn sending_to_a_missing_socket_fails() {
     let dir = tempfile::tempdir().unwrap();
-    let missing = dir.path().join("zproxy.sock");
+    let missing = dir.path().join("localproxy.sock");
 
     let error = send_command(missing.clone(), ControlCommand::Status)
         .await
@@ -158,7 +158,7 @@ async fn sending_to_a_missing_socket_fails() {
 #[tokio::test]
 async fn serve_replaces_a_stale_socket_file() {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(dir.path());
+    let paths = localproxy::testing::paths(dir.path());
     paths.ensure_dirs().unwrap();
     std::fs::write(paths.control_socket(), b"stale").unwrap();
 

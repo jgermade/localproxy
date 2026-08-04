@@ -1,10 +1,10 @@
 //! `ProxyStream`: the async read/write wrapper used for every hop.
 
+use localproxy::stream::ProxyStream;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
-use zproxy::stream::ProxyStream;
 
 #[tokio::test]
 async fn the_tcp_variant_reads_writes_flushes_and_shuts_down() {

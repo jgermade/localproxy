@@ -6,16 +6,16 @@ use std::{
     time::Duration,
 };
 
+use localproxy::{
+    app::SharedState,
+    config::{AppConfig, FallbackConfig, ListenConfig, ProxyProtocol, UpstreamConfig},
+    proxy,
+};
 use tempfile::TempDir;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     time::timeout,
-};
-use zproxy::{
-    app::SharedState,
-    config::{AppConfig, FallbackConfig, ListenConfig, ProxyProtocol, UpstreamConfig},
-    proxy,
 };
 
 const TEST_TIMEOUT: Duration = Duration::from_secs(10);
@@ -91,10 +91,10 @@ async fn spawn_fake_http_proxy(accept_connect: bool) -> (SocketAddr, Arc<Mutex<V
 
 async fn spawn_proxy(config: AppConfig) -> (SharedState, SocketAddr, TempDir) {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(dir.path());
+    let paths = localproxy::testing::paths(dir.path());
     paths.ensure_dirs().unwrap();
     let listen = config.listen.socket_addr();
-    let state = zproxy::testing::state(paths, config);
+    let state = localproxy::testing::state(paths, config);
 
     let server_state = state.clone();
     tokio::spawn(async move { proxy::serve(server_state).await });
@@ -314,8 +314,8 @@ async fn serve_fails_when_the_listen_address_is_already_taken() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let taken = listener.local_addr().unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let state = zproxy::testing::state(
-        zproxy::testing::paths(dir.path()),
+    let state = localproxy::testing::state(
+        localproxy::testing::paths(dir.path()),
         config_listening_on(taken.port()),
     );
 

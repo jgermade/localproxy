@@ -1,4 +1,4 @@
-//! zproxy: local proxy daemon with dynamic upstream resolution.
+//! localproxy: local proxy daemon with dynamic upstream resolution.
 //!
 //! The binary in `src/main.rs` is a thin wrapper around [`cli::run`]; every piece of
 //! behaviour lives in this library so it can be driven from the integration tests
@@ -16,12 +16,12 @@ pub mod testing;
 
 /// Installs the `tracing` subscriber used by the CLI.
 ///
-/// The level can be overridden with `RUST_LOG`; the default is `info,zproxy=debug`.
+/// The level can be overridden with `RUST_LOG`; the default is `info,localproxy=debug`.
 pub fn init_tracing() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,zproxy=debug".into()),
+                .unwrap_or_else(|_| "info,localproxy=debug".into()),
         )
         .with_target(false)
         .init();

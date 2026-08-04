@@ -85,7 +85,7 @@ impl PidGuard {
 
         lock_file
             .try_lock_exclusive()
-            .map_err(|_| anyhow!("zproxy ya está corriendo o el lockfile está ocupado"))?;
+            .map_err(|_| anyhow!("localproxy ya está corriendo o el lockfile está ocupado"))?;
 
         let pid = std::process::id();
         lock_file.set_len(0)?;
@@ -127,7 +127,7 @@ pub fn start_detached(paths: &config::AppPaths) -> Result<u32> {
 
     let child = command
         .spawn()
-        .context("no se pudo arrancar zproxy daemon en background")?;
+        .context("no se pudo arrancar localproxy daemon en background")?;
 
     Ok(child.id())
 }

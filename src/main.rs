@@ -2,6 +2,6 @@ use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    zproxy::init_tracing();
-    zproxy::cli::run().await
+    localproxy::init_tracing();
+    localproxy::cli::run().await
 }

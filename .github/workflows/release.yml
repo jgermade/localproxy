@@ -113,7 +113,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.bump-version.outputs.tag }}
-          name: "zproxy ${{ needs.bump-version.outputs.tag }}"
+          name: "localproxy ${{ needs.bump-version.outputs.tag }}"
           body_path: release_notes.md
           files: dist/**/*
           draft: false

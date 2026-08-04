@@ -343,6 +343,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
+name = "localproxy"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dialoguer",
+ "dirs",
+ "fs2",
+ "http",
+ "libc",
+ "pin-project-lite",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tokio-socks",
+ "tokio-util",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -926,25 +948,3 @@ name = "zeroize"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
-
-[[package]]
-name = "zproxy"
-version = "0.1.2"
-dependencies = [
- "anyhow",
- "clap",
- "dialoguer",
- "dirs",
- "fs2",
- "http",
- "libc",
- "pin-project-lite",
- "serde",
- "tempfile",
- "tokio",
- "tokio-socks",
- "tokio-util",
- "toml",
- "tracing",
- "tracing-subscriber",
-]

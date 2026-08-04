@@ -2,13 +2,13 @@
 
 ## Layout
 
-zproxy is split into a library and a very thin binary:
+localproxy is split into a library and a very thin binary:
 
 | Path | Role |
 |---|---|
-| [src/lib.rs](../src/lib.rs) | Library crate (`zproxy`) exposing every module. |
+| [src/lib.rs](../src/lib.rs) | Library crate (`localproxy`) exposing every module. |
 | [src/cli.rs](../src/cli.rs) | Argument definitions (`Cli`, `Command`, `ServiceCommand`) and command dispatch. |
-| [src/main.rs](../src/main.rs) | Wrapper: installs tracing and calls `zproxy::cli::run()`. |
+| [src/main.rs](../src/main.rs) | Wrapper: installs tracing and calls `localproxy::cli::run()`. |
 | [src/testing.rs](../src/testing.rs) | Helpers to build `AppPaths` / `SharedState` rooted at a temp dir. |
 | [tests/](../tests) | Integration tests, one file per area, driving the public API. |
 
@@ -17,7 +17,7 @@ Because of that split, tests come in two flavours:
 - **Unit tests** stay inside each module as `#[cfg(test)] mod tests` blocks, and cover private
   functions: HTTP head parsing, route resolution, gateway output parsing, plist escaping, the
   config description helpers and the wizard accessors.
-- **Integration tests** live in `tests/` as separate crates that link against `zproxy` and can only
+- **Integration tests** live in `tests/` as separate crates that link against `localproxy` and can only
   touch the public API. They spin up real listeners over loopback sockets.
 
 ## Run the suite
@@ -55,17 +55,17 @@ cargo test -- --test-threads 1     # serialise, useful when debugging port issue
 
 Deliberately **not** covered:
 
-- `zproxy service install` / `uninstall` on macOS and Linux — they call `launchctl` / `systemctl`
+- `localproxy service install` / `uninstall` on macOS and Linux — they call `launchctl` / `systemctl`
   and would modify the machine running the tests.
-- `app::start_detached` and `zproxy start` — they spawn the current executable, which under
+- `app::start_detached` and `localproxy start` — they spawn the current executable, which under
   `cargo test` is the test harness itself.
-- The `zproxy config` wizard prompts — they require an interactive terminal.
+- The `localproxy config` wizard prompts — they require an interactive terminal.
 - The SOCKS5 branch of `ProxyStream`, which needs a real SOCKS5 server.
 
 ## Test conventions
 
-- Every test uses `tempfile::tempdir()` for config and state; nothing touches `~/.config/zproxy` or
-  `~/.local/state/zproxy`. Use `zproxy::testing::paths()` / `zproxy::testing::state()` instead of
+- Every test uses `tempfile::tempdir()` for config and state; nothing touches `~/.config/localproxy` or
+  `~/.local/state/localproxy`. Use `localproxy::testing::paths()` / `localproxy::testing::state()` instead of
   hand-rolling paths.
 - Network tests bind to `127.0.0.1:0` and read back the assigned port, so they run in parallel
   without port collisions.

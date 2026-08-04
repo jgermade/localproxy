@@ -1,30 +1,30 @@
 # Configuration
 
-zproxy stores its configuration as TOML at `~/.config/zproxy/config.toml`.
+localproxy stores its configuration as TOML at `~/.config/localproxy/config.toml`.
 
 Run the interactive wizard at any time:
 
 ```bash
-zproxy config
+localproxy config
 ```
 
 The wizard saves the file and, if the daemon is running, hot-reloads the configuration without restarting the process. To reload manually:
 
 ```bash
-zproxy reload
+localproxy reload
 ```
 
 ---
 
-# The `zproxy config` wizard
+# The `localproxy config` wizard
 
 ## How it works
 
-`zproxy config` is a fully interactive terminal wizard:
+`localproxy config` is a fully interactive terminal wizard:
 
 1. It loads the current config (or creates a default one if none exists).
 2. Every prompt is **pre-filled with the current value**, so pressing <kbd>Enter</kbd> keeps it.
-3. Once finished, it writes `~/.config/zproxy/config.toml`.
+3. Once finished, it writes `~/.config/localproxy/config.toml`.
 4. It then sends a `reload` command over the control socket, so a running daemon picks up the change immediately.
 
 Controls:
@@ -111,10 +111,10 @@ Text inputs show the default in parentheses. Pressing <kbd>Enter</kbd> accepts i
 
 ### Example 1 — Direct mode (no upstream)
 
-Simplest setup: zproxy listens locally and connects straight to the destination.
+Simplest setup: localproxy listens locally and connects straight to the destination.
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · none
@@ -122,7 +122,7 @@ $ zproxy config
 reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 ```
 
-Resulting `~/.config/zproxy/config.toml`:
+Resulting `~/.config/localproxy/config.toml`:
 
 ```toml
 [listen]
@@ -141,7 +141,7 @@ type = "direct"
 Routes traffic through an HTTP proxy running on the current default gateway, and falls back to a direct connection when that proxy is unreachable (for example, off the corporate network).
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · gateway
@@ -177,7 +177,7 @@ type = "direct"
 Forces all traffic through a local SOCKS5 proxy (for example an SSH tunnel opened with `ssh -D 1080`). With `fallback = none`, connections fail if the tunnel is down instead of leaking traffic directly.
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · static
@@ -211,7 +211,7 @@ type = "none"
 Two proxies: a primary one and a backup one.
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · static
@@ -230,7 +230,7 @@ reloaded: listen=127.0.0.1:8888 upstream=static:http:proxy-a.internal:8080 fallb
 The config is still written to disk; only the live reload is skipped.
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 8888
 ✔ Upstream type · none
@@ -241,7 +241,7 @@ config saved; daemon not notified: No such file or directory (os error 2)
 Start the daemon afterwards to apply it:
 
 ```bash
-zproxy start
+localproxy start
 ```
 
 ### Example 6 — Changing only the listen port
@@ -249,7 +249,7 @@ zproxy start
 Every prompt is pre-filled, so you only touch what you need. Press <kbd>Enter</kbd> on everything else.
 
 ```console
-$ zproxy config
+$ localproxy config
 ✔ Listen host · 127.0.0.1
 ✔ Listen port · 9999
 ✔ Upstream type · gateway
@@ -263,7 +263,7 @@ reloaded: listen=127.0.0.1:9999 upstream=gateway:http:8080 fallback=direct gatew
 > The listen address is bound at startup. A `reload` does **not** move the listener to the new port; restart the daemon:
 >
 > ```bash
-> zproxy service restart   # or: zproxy stop && zproxy start
+> localproxy service restart   # or: localproxy stop && localproxy start
 > ```
 
 ## Aborting the wizard
@@ -275,7 +275,7 @@ Pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> at any prompt exits without writing anythi
 The wizard is optional; `config.toml` can be edited directly. Apply the changes with:
 
 ```bash
-zproxy reload
+localproxy reload
 ```
 
 ---
@@ -422,7 +422,7 @@ type = "none"
 
 ### fallback = direct
 
-If the upstream fails, zproxy attempts a direct connection to the destination.
+If the upstream fails, localproxy attempts a direct connection to the destination.
 
 ```toml
 [fallback]
@@ -431,7 +431,7 @@ type = "direct"
 
 ### fallback = saved
 
-If the upstream fails, zproxy tries an entry from the `[[proxy]]` list.
+If the upstream fails, localproxy tries an entry from the `[[proxy]]` list.
 
 | Field | Type | Description |
 |---|---|---|
@@ -445,7 +445,7 @@ name = "tunnel"
 
 ### fallback = static
 
-If the upstream fails, zproxy tries a second fixed proxy.
+If the upstream fails, localproxy tries a second fixed proxy.
 
 | Field | Type | Description |
 |---|---|---|

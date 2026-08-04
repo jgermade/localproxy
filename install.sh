@@ -1,17 +1,17 @@
 #!/bin/sh
-# zproxy installer. See usage() below or run with --help.
+# localproxy installer. See usage() below or run with --help.
 
 set -eu
 
-REPO="jgermade/zproxy"
-BLOCK_BEGIN="# --- zproxy ---------------------------------------------------------------"
-BLOCK_END="# --- end zproxy -----------------------------------------------------------"
+REPO="jgermade/localproxy"
+BLOCK_BEGIN="# --- localproxy -----------------------------------------------------------"
+BLOCK_END="# --- end localproxy -------------------------------------------------------"
 
-version="${ZPROXY_VERSION:-}"
-install_dir="${ZPROXY_INSTALL_DIR:-$HOME/.local/bin}"
-profile="${ZPROXY_PROFILE:-}"
+version="${LOCALPROXY_VERSION:-}"
+install_dir="${LOCALPROXY_INSTALL_DIR:-$HOME/.local/bin}"
+profile="${LOCALPROXY_PROFILE:-}"
 modify_profile=1
-[ -n "${ZPROXY_NO_MODIFY_PROFILE:-}" ] && modify_profile=0
+[ -n "${LOCALPROXY_NO_MODIFY_PROFILE:-}" ] && modify_profile=0
 
 tmp_file=""
 
@@ -30,20 +30,20 @@ trap cleanup EXIT INT TERM
 
 usage() {
   cat << 'USAGE'
-zproxy installer.
+localproxy installer.
 
-  curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
-  wget -qO-  https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
+  wget -qO-  https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
 
 Options (each one has an environment variable equivalent):
 
-  --version <vX.Y.Z>     ZPROXY_VERSION            release to install (default: latest)
-  --dir <path>           ZPROXY_INSTALL_DIR        install directory (default: ~/.local/bin)
-  --profile <path>       ZPROXY_PROFILE            shell profile to update (default: autodetect)
-  --no-modify-profile    ZPROXY_NO_MODIFY_PROFILE  do not touch any shell profile
+  --version <vX.Y.Z>     LOCALPROXY_VERSION            release to install (default: latest)
+  --dir <path>           LOCALPROXY_INSTALL_DIR        install directory (default: ~/.local/bin)
+  --profile <path>       LOCALPROXY_PROFILE            shell profile to update (default: autodetect)
+  --no-modify-profile    LOCALPROXY_NO_MODIFY_PROFILE  do not touch any shell profile
   --help
 
-  GITHUB_TOKEN (or ZPROXY_GITHUB_TOKEN) is used to download release assets when
+  GITHUB_TOKEN (or LOCALPROXY_GITHUB_TOKEN) is used to download release assets when
   the repository is private.
 
 Pass options through a pipe with `-s --`:
@@ -99,12 +99,12 @@ detect_asset() {
   *) die "unsupported architecture: $arch" ;;
   esac
 
-  printf 'zproxy-%s-%s' "$os_name" "$arch_name"
+  printf 'localproxy-%s-%s' "$os_name" "$arch_name"
 }
 
 # --- download --------------------------------------------------------------
 
-token="${ZPROXY_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
+token="${LOCALPROXY_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 
 # fetch <url> <output|-> [accept] [authenticated]
 fetch() {
@@ -137,7 +137,7 @@ resolve_asset_url() {
     api="https://api.github.com/repos/$REPO/releases/latest"
   fi
 
-  release_json="$(mktemp "${TMPDIR:-/tmp}/zproxy-release.XXXXXX")"
+  release_json="$(mktemp "${TMPDIR:-/tmp}/localproxy-release.XXXXXX")"
   if ! fetch "$api" "$release_json" "application/vnd.github+json" 1; then
     rm -f "$release_json"
     die "cannot read $api (is the token valid?)"
@@ -163,17 +163,17 @@ if [ -n "$version" ]; then
   v*) : ;;
   *) version="v$version" ;;
   esac
-  log "Installing zproxy $version ($asset)"
+  log "Installing localproxy $version ($asset)"
 else
-  log "Installing zproxy latest ($asset)"
+  log "Installing localproxy latest ($asset)"
 fi
 
 mkdir -p "$install_dir" || die "cannot create $install_dir"
 [ -w "$install_dir" ] || die "$install_dir is not writable"
 
 # Staged in the target directory so the final move is an atomic rename on the
-# same filesystem; that also works while an older zproxy is still running.
-tmp_file="$(mktemp "$install_dir/.zproxy.XXXXXX")"
+# same filesystem; that also works while an older localproxy is still running.
+tmp_file="$(mktemp "$install_dir/.localproxy.XXXXXX")"
 
 if [ -n "$token" ]; then
   url="$(resolve_asset_url)" || exit 1
@@ -208,10 +208,10 @@ fi
 "$tmp_file" --version > /dev/null 2>&1 ||
   die "the downloaded binary does not run on this machine"
 
-mv -f "$tmp_file" "$install_dir/zproxy"
+mv -f "$tmp_file" "$install_dir/localproxy"
 tmp_file=""
 
-log "Installed $("$install_dir/zproxy" --version) -> $install_dir/zproxy"
+log "Installed $("$install_dir/localproxy" --version) -> $install_dir/localproxy"
 
 # --- shell profile ---------------------------------------------------------
 
@@ -246,25 +246,25 @@ write_block() {
   {
     printf '\n%s\n' "$BLOCK_BEGIN"
     printf 'export PATH="%s:$PATH"\n\n' "$(portable_dir)"
-    cat << 'ZPROXY_BLOCK'
-ZPROXY_URL="http://127.0.0.1:8888"
-ZPROXY_NO_PROXY="localhost,127.0.0.1,::1"
+    cat << 'LOCALPROXY_BLOCK'
+LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
-if command -v zproxy > /dev/null 2>&1; then
-  # `zproxy status` talks to the control socket, so it only succeeds when the
+if command -v localproxy > /dev/null 2>&1; then
+  # `localproxy status` talks to the control socket, so it only succeeds when the
   # daemon is really listening. Start it in the background otherwise.
-  zproxy status > /dev/null 2>&1 || zproxy start --detached > /dev/null 2>&1
+  localproxy status > /dev/null 2>&1 || localproxy start --detached > /dev/null 2>&1
 
-  export http_proxy="$ZPROXY_URL"
-  export https_proxy="$ZPROXY_URL"
-  export all_proxy="$ZPROXY_URL"
-  export HTTP_PROXY="$ZPROXY_URL"
-  export HTTPS_PROXY="$ZPROXY_URL"
-  export ALL_PROXY="$ZPROXY_URL"
-  export no_proxy="$ZPROXY_NO_PROXY"
-  export NO_PROXY="$ZPROXY_NO_PROXY"
+  export http_proxy="$LOCALPROXY_URL"
+  export https_proxy="$LOCALPROXY_URL"
+  export all_proxy="$LOCALPROXY_URL"
+  export HTTP_PROXY="$LOCALPROXY_URL"
+  export HTTPS_PROXY="$LOCALPROXY_URL"
+  export ALL_PROXY="$LOCALPROXY_URL"
+  export no_proxy="$LOCALPROXY_NO_PROXY"
+  export NO_PROXY="$LOCALPROXY_NO_PROXY"
 fi
-ZPROXY_BLOCK
+LOCALPROXY_BLOCK
     printf '%s\n' "$BLOCK_END"
   } >> "$target"
 }
@@ -281,11 +281,11 @@ if [ "$modify_profile" -eq 1 ]; then
     if [ ! -w "$profile" ]; then
       warn "cannot write $profile; skipping profile setup"
     elif grep -qF "$BLOCK_BEGIN" "$profile" 2> /dev/null; then
-      log "zproxy block already present in $profile; leaving it untouched"
+      log "localproxy block already present in $profile; leaving it untouched"
     else
       write_block "$profile"
       profile_updated=1
-      log "Added the zproxy block to $profile"
+      log "Added the localproxy block to $profile"
     fi
   fi
 fi
@@ -299,9 +299,9 @@ esac
 
 log ""
 log "Next steps:"
-log "  1. zproxy config              # interactive wizard"
-log "  2. zproxy service install     # run it as a user-level service (optional)"
-log "  3. zproxy start"
+log "  1. localproxy config              # interactive wizard"
+log "  2. localproxy service install     # run it as a user-level service (optional)"
+log "  3. localproxy start"
 if [ "$profile_updated" -eq 1 ]; then
   log ""
   log "Reload your shell to pick up the proxy variables:"

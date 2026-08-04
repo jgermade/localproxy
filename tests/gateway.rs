@@ -5,13 +5,13 @@ use std::{
     time::Duration,
 };
 
-use zproxy::{config, gateway};
+use localproxy::{config, gateway};
 
 #[tokio::test]
 async fn the_detector_returns_immediately_when_already_cancelled() {
     let dir = tempfile::tempdir().unwrap();
-    let state = zproxy::testing::state(
-        zproxy::testing::paths(dir.path()),
+    let state = localproxy::testing::state(
+        localproxy::testing::paths(dir.path()),
         config::AppConfig::default(),
     );
     state.shutdown.cancel();
@@ -22,8 +22,8 @@ async fn the_detector_returns_immediately_when_already_cancelled() {
 #[tokio::test]
 async fn the_detector_clears_the_gateway_outside_gateway_mode() {
     let dir = tempfile::tempdir().unwrap();
-    let state = zproxy::testing::state(
-        zproxy::testing::paths(dir.path()),
+    let state = localproxy::testing::state(
+        localproxy::testing::paths(dir.path()),
         config::AppConfig::default(),
     );
     *state.gateway_ip.write().await = Some(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)));

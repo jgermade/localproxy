@@ -8,7 +8,7 @@ use crate::{app, config, control, service};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "zproxy",
+    name = "localproxy",
     author,
     version,
     about = "Local proxy daemon with dynamic upstream resolution"

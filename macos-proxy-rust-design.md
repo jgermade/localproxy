@@ -87,20 +87,20 @@ For machines without admin privileges (where installing as `launchd`/`systemd` i
 
 ### Launcher in `.zshrc` / `.bashrc`
 
-- Check based on a **pidfile** (`~/.local/state/zproxy/zproxy.pid`) + `flock` on a lockfile, to avoid race conditions when several terminals open at the same time.
+- Check based on a **pidfile** (`~/.local/state/localproxy/localproxy.pid`) + `flock` on a lockfile, to avoid race conditions when several terminals open at the same time.
 - On shell startup:
   1. Does the pidfile exist?
-  2. Is the PID alive (`kill -0`) and does it actually correspond to `zproxy` (avoid recycled PIDs)?
+  2. Is the PID alive (`kill -0`) and does it actually correspond to `localproxy` (avoid recycled PIDs)?
   3. If not, clean up the pidfile and relaunch.
-- Start with `nohup zproxy daemon >> ~/.local/state/zproxy/log 2>&1 & disown` so it survives closing the terminal.
+- Start with `nohup localproxy daemon >> ~/.local/state/localproxy/log 2>&1 & disown` so it survives closing the terminal.
 - The check must be cheap (read pidfile + `kill -0`), without spawning heavy processes in every new shell.
 
-### `zproxy config` — interactive wizard + hot reload
+### `localproxy config` — interactive wizard + hot reload
 
-- The `zproxy config` command launches a terminal wizard (candidate crates: `dialoguer` or `inquire`) to configure listen/upstream/fallback.
-- Control channel via a **Unix socket** (`~/.local/state/zproxy/zproxy.sock`) instead of signals (`SIGHUP`), being more flexible and portable across macOS/Linux:
+- The `localproxy config` command launches a terminal wizard (candidate crates: `dialoguer` or `inquire`) to configure listen/upstream/fallback.
+- Control channel via a **Unix socket** (`~/.local/state/localproxy/localproxy.sock`) instead of signals (`SIGHUP`), being more flexible and portable across macOS/Linux:
   - When saving the config, the wizard writes the TOML and sends a `reload` command over the socket.
-  - The same socket serves `zproxy status`, `zproxy stop`, etc.
+  - The same socket serves `localproxy status`, `localproxy stop`, etc.
   - If the daemon is not running, the wizard saves the TOML without notifying; the shell launcher will pick it up on the next start.
 
 ### Distribution as a real service (machines with privileges)
@@ -132,5 +132,5 @@ The proxy core (`tokio`, `hyper`, `tokio-socks`, `rustls`, `serde`/`toml`, `clap
 - [ ] Decide whether there will be a UI (Tauri) or only a CLI/daemon with LaunchAgent.
 - [ ] Minimal prototype: HTTP proxy server with `hyper` + `CONNECT` support, no upstream yet.
 - [ ] Design the `GatewayDetector` trait (or similar) to separate per-platform implementations (macOS/Linux) from the start.
-- [ ] Implement the shell launcher (pidfile + lock) and the `zproxy daemon` command.
-- [ ] Implement the Unix control socket (reload/status/stop) and the `zproxy config` wizard.
+- [ ] Implement the shell launcher (pidfile + lock) and the `localproxy daemon` command.
+- [ ] Implement the Unix control socket (reload/status/stop) and the `localproxy config` wizard.

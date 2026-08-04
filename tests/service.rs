@@ -2,12 +2,12 @@
 
 use std::fs;
 
-use zproxy::service;
+use localproxy::service;
 
 #[test]
 fn is_installed_answers_without_failing() {
     let dir = tempfile::tempdir().unwrap();
-    let paths = zproxy::testing::paths(dir.path());
+    let paths = localproxy::testing::paths(dir.path());
 
     // It inspects the real HOME, so only the absence of errors can be asserted.
     assert!(service::is_installed(&paths).is_ok());
@@ -16,7 +16,7 @@ fn is_installed_answers_without_failing() {
 #[test]
 fn tailing_a_missing_log_file_fails() {
     let dir = tempfile::tempdir().unwrap();
-    let missing = dir.path().join("zproxy.log");
+    let missing = dir.path().join("localproxy.log");
 
     let error = service::tail_file(&missing, 10, false).unwrap_err();
 
@@ -26,7 +26,7 @@ fn tailing_a_missing_log_file_fails() {
 #[test]
 fn tailing_an_existing_log_file_succeeds() {
     let dir = tempfile::tempdir().unwrap();
-    let log = dir.path().join("zproxy.log");
+    let log = dir.path().join("localproxy.log");
     fs::write(&log, "line one\nline two\n").unwrap();
 
     assert!(service::tail_file(&log, 1, false).is_ok());

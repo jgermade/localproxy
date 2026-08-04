@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use crate::config;
 
 #[cfg(target_os = "linux")]
-const SERVICE_UNIT: &str = "zproxy.service";
+const SERVICE_UNIT: &str = "localproxy.service";
 
 pub fn install(paths: &config::AppPaths) -> Result<()> {
     #[cfg(target_os = "macos")]
@@ -374,7 +374,7 @@ fn install_linux(paths: &config::AppPaths) -> Result<()> {
     }
 
     let unit = format!(
-        "[Unit]\nDescription=zproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} daemon\nWorkingDirectory={}\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+        "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} daemon\nWorkingDirectory={}\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         exe.display(),
         home.display(),
     );
@@ -510,7 +510,7 @@ fn xml_escape(value: &str) -> String {
 
 #[cfg(any(target_os = "macos", test))]
 fn service_label() -> &'static str {
-    "dev.zproxy"
+    "dev.localproxy"
 }
 
 #[cfg(test)]
@@ -523,12 +523,15 @@ mod tests {
             xml_escape(r#"/a&b/<c>/"d"/'e'"#),
             "/a&amp;b/&lt;c&gt;/&quot;d&quot;/&apos;e&apos;"
         );
-        assert_eq!(xml_escape("/usr/local/bin/zproxy"), "/usr/local/bin/zproxy");
+        assert_eq!(
+            xml_escape("/usr/local/bin/localproxy"),
+            "/usr/local/bin/localproxy"
+        );
     }
 
     #[test]
     fn the_service_label_is_stable() {
-        assert_eq!(service_label(), "dev.zproxy");
+        assert_eq!(service_label(), "dev.localproxy");
     }
 
     #[test]
@@ -545,7 +548,7 @@ mod tests {
 
     #[test]
     fn run_cmd_reports_missing_programs() {
-        let error = run_cmd("zproxy-does-not-exist", &[]).unwrap_err();
+        let error = run_cmd("localproxy-does-not-exist", &[]).unwrap_err();
 
         assert!(error.to_string().contains("falló al ejecutar"));
     }

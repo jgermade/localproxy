@@ -18,8 +18,8 @@ pub struct AppPaths {
 impl AppPaths {
     pub fn discover() -> Result<Self> {
         let home = dirs::home_dir().context("no se pudo resolver HOME")?;
-        let config_dir = home.join(".config").join("zproxy");
-        let state_dir = home.join(".local").join("state").join("zproxy");
+        let config_dir = home.join(".config").join("localproxy");
+        let state_dir = home.join(".local").join("state").join("localproxy");
 
         Ok(Self {
             config_file: config_dir.join("config.toml"),
@@ -35,19 +35,19 @@ impl AppPaths {
     }
 
     pub fn control_socket(&self) -> PathBuf {
-        self.state_dir.join("zproxy.sock")
+        self.state_dir.join("localproxy.sock")
     }
 
     pub fn pid_file(&self) -> PathBuf {
-        self.state_dir.join("zproxy.pid")
+        self.state_dir.join("localproxy.pid")
     }
 
     pub fn lock_file(&self) -> PathBuf {
-        self.state_dir.join("zproxy.lock")
+        self.state_dir.join("localproxy.lock")
     }
 
     pub fn log_file(&self) -> PathBuf {
-        self.state_dir.join("zproxy.log")
+        self.state_dir.join("localproxy.log")
     }
 }
 
