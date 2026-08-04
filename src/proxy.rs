@@ -396,11 +396,11 @@ async fn resolve_routes(state: &SharedState) -> Vec<Route> {
 fn resolve_routes_from_config(config: &AppConfig, gateway: Option<IpAddr>) -> Vec<Route> {
     let mut routes = Vec::new();
 
-    if let Some(upstream) = config::resolve_upstream_endpoint(&config.upstream, gateway) {
+    if let Some(upstream) = config::resolve_upstream_endpoint(config, gateway) {
         routes.push(Route::Proxy(upstream));
     }
 
-    if let Some(fallback) = config::resolve_fallback_endpoint(&config.fallback) {
+    if let Some(fallback) = config::resolve_fallback_endpoint(config) {
         routes.push(Route::Proxy(fallback));
     }
 

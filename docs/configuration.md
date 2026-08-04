@@ -44,18 +44,41 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 |---|---|---|---|---|
 | 1 | `Listen host` | text | always | current value (`127.0.0.1`) |
 | 2 | `Listen port` | text | always | current value (`8888`) |
-| 3 | `Upstream type` | list: `none` / `gateway` / `static` | always | current type |
-| 4 | `Proxy protocol` | list: `http` / `socks5` | upstream is `gateway` or `static` | current protocol |
-| 5 | `Gateway upstream port` | text | upstream is `gateway` | current or `8080` |
-| 6 | `Gateway poll interval (seconds)` | text | upstream is `gateway` | current or `5` |
-| 7 | `Static upstream host` | text | upstream is `static` | current or `127.0.0.1` |
-| 8 | `Static upstream port` | text | upstream is `static` | current or `8080` |
-| 9 | `Fallback type` | list: `none` / `direct` / `static` | always | current type |
-| 10 | `Proxy protocol` | list: `http` / `socks5` | fallback is `static` | current protocol |
-| 11 | `Fallback host` | text | fallback is `static` | current or `127.0.0.1` |
-| 12 | `Fallback port` | text | fallback is `static` | current or `8080` |
+| 3 | `Proxies guardados` | menu: saved proxies + `+ añadir proxy` / `- eliminar proxy` / `continuar` | always | `continuar` |
+| 4 | `Nombre del proxy`, `Proxy protocol`, `Host`, `Puerto`, `Connect timeout (ms)` | text + list | adding or editing a saved proxy | current values |
+| 5 | `Upstream type` | list: `none` / `gateway` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
+| 6 | `Proxy protocol` | list: `http` / `socks5` | upstream is `gateway` or `static` | current protocol |
+| 7 | `Gateway upstream port` | text | upstream is `gateway` | current or `8080` |
+| 8 | `Gateway poll interval (seconds)` | text | upstream is `gateway` | current or `5` |
+| 9 | `Upstream proxy` | list of saved proxies | upstream is `saved` | current selection |
+| 10 | `Static upstream host` | text | upstream is `static` | current or `127.0.0.1` |
+| 11 | `Static upstream port` | text | upstream is `static` | current or `8080` |
+| 12 | `Fallback type` | list: `none` / `direct` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
+| 13 | `Proxy protocol` | list: `http` / `socks5` | fallback is `static` | current protocol |
+| 14 | `Fallback proxy` | list of saved proxies | fallback is `saved` | current selection |
+| 15 | `Fallback host` | text | fallback is `static` | current or `127.0.0.1` |
+| 16 | `Fallback port` | text | fallback is `static` | current or `8080` |
 
-> `connect_timeout_ms` is **not** asked by the wizard. It is always written as `3000`. Edit the TOML file manually to change it.
+> `connect_timeout_ms` is only asked for saved proxies. For `gateway` and `static` entries it is always written as `3000`. Edit the TOML file manually to change it.
+
+## Managing the saved proxy list
+
+The `Proxies guardados` step is a menu that loops until you pick `continuar`:
+
+```text
+? Proxies guardados (edita, añade o continúa) ›
+  corp (http://proxy-a.internal:8080)
+  tunnel (socks5://127.0.0.1:1080)
+  + añadir proxy
+  - eliminar proxy
+❯ continuar
+```
+
+- Selecting an existing entry re-opens its prompts so you can edit it.
+- `+ añadir proxy` appends a new entry; reusing an existing name overwrites that entry.
+- `- eliminar proxy` asks which entry to delete.
+
+Once the list has at least one entry, `saved` becomes available as an upstream and fallback type, so you can switch between proxies without retyping host and port.
 
 ## What a list prompt looks like
 
@@ -271,6 +294,13 @@ type = "none"
 
 [fallback]
 type = "direct"
+
+[[proxy]]
+name = "corp"
+protocol = "http"
+host = "proxy-a.internal"
+port = 8080
+connect_timeout_ms = 3000
 ```
 
 ## [listen]
@@ -280,9 +310,39 @@ type = "direct"
 | `host` | IP string | `"127.0.0.1"` | Local bind address. |
 | `port` | integer | `8888` | Local bind port. |
 
+## [[proxy]]
+
+Optional list of saved proxies. Each entry is a named endpoint that `upstream` and `fallback` can reference by name with `type = "saved"`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | — | Unique identifier used by `type = "saved"`. |
+| `protocol` | `"http"` \| `"socks5"` | `"http"` | Proxy protocol. |
+| `host` | string | — | Hostname or IP. |
+| `port` | integer | — | Proxy port. |
+| `connect_timeout_ms` | integer | `3000` | Connection timeout in milliseconds. |
+
+```toml
+[[proxy]]
+name = "corp"
+protocol = "http"
+host = "proxy-a.internal"
+port = 8080
+connect_timeout_ms = 3000
+
+[[proxy]]
+name = "tunnel"
+protocol = "socks5"
+host = "127.0.0.1"
+port = 1080
+connect_timeout_ms = 3000
+```
+
+> If `type = "saved"` points to a name that no longer exists in the list, that route is skipped as if it were unreachable.
+
 ## [upstream]
 
-Three types are supported: `none`, `gateway`, `static`.
+Four types are supported: `none`, `gateway`, `saved`, `static`.
 
 ### upstream = none
 
@@ -313,6 +373,20 @@ poll_interval_secs = 5
 connect_timeout_ms = 3000
 ```
 
+### upstream = saved
+
+Uses one of the entries from the `[[proxy]]` list.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | `name` of a `[[proxy]]` entry. |
+
+```toml
+[upstream]
+type = "saved"
+name = "corp"
+```
+
 ### upstream = static
 
 Fixed upstream proxy address.
@@ -335,7 +409,7 @@ connect_timeout_ms = 3000
 
 ## [fallback]
 
-Three types are supported: `none`, `direct`, `static`.
+Four types are supported: `none`, `direct`, `saved`, `static`.
 
 ### fallback = none
 
@@ -353,6 +427,20 @@ If the upstream fails, zproxy attempts a direct connection to the destination.
 ```toml
 [fallback]
 type = "direct"
+```
+
+### fallback = saved
+
+If the upstream fails, zproxy tries an entry from the `[[proxy]]` list.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | `name` of a `[[proxy]]` entry. |
+
+```toml
+[fallback]
+type = "saved"
+name = "tunnel"
 ```
 
 ### fallback = static
@@ -378,7 +466,7 @@ connect_timeout_ms = 3000
 ## Resolution order
 
 1. Try the primary upstream (if resolvable).
-2. Try the static fallback (if configured as `static`).
+2. Try the fallback proxy (if configured as `saved` or `static`).
 3. Attempt a direct connection if `fallback = "direct"` or no upstream is configured.
 4. Return `502 Bad Gateway` to the client if nothing succeeds.
 

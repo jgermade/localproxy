@@ -59,6 +59,8 @@ pub struct AppConfig {
     pub upstream: UpstreamConfig,
     #[serde(default)]
     pub fallback: FallbackConfig,
+    #[serde(default, rename = "proxy")]
+    pub proxies: Vec<SavedProxy>,
 }
 
 impl Default for AppConfig {
@@ -67,6 +69,35 @@ impl Default for AppConfig {
             listen: ListenConfig::default(),
             upstream: UpstreamConfig::None,
             fallback: FallbackConfig::Direct,
+            proxies: Vec::new(),
+        }
+    }
+}
+
+impl AppConfig {
+    pub fn find_proxy(&self, name: &str) -> Option<&SavedProxy> {
+        self.proxies.iter().find(|proxy| proxy.name == name)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedProxy {
+    pub name: String,
+    #[serde(default)]
+    pub protocol: ProxyProtocol,
+    pub host: String,
+    pub port: u16,
+    #[serde(default = "default_connect_timeout_ms")]
+    pub connect_timeout_ms: u64,
+}
+
+impl SavedProxy {
+    pub fn endpoint(&self) -> ProxyEndpoint {
+        ProxyEndpoint {
+            protocol: self.protocol,
+            host: self.host.clone(),
+            port: self.port,
+            connect_timeout_ms: self.connect_timeout_ms,
         }
     }
 }
@@ -107,6 +138,9 @@ pub enum UpstreamConfig {
         #[serde(default = "default_connect_timeout_ms")]
         connect_timeout_ms: u64,
     },
+    Saved {
+        name: String,
+    },
     Static {
         #[serde(default)]
         protocol: ProxyProtocol,
@@ -128,6 +162,9 @@ impl Default for UpstreamConfig {
 pub enum FallbackConfig {
     None,
     Direct,
+    Saved {
+        name: String,
+    },
     Static {
         #[serde(default)]
         protocol: ProxyProtocol,
@@ -202,8 +239,9 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
         .default(current.listen.port)
         .interact_text()?;
 
-    let upstream = prompt_upstream(&theme, &current.upstream)?;
-    let fallback = prompt_fallback(&theme, &current.fallback)?;
+    let proxies = prompt_proxy_list(&theme, current.proxies.clone())?;
+    let upstream = prompt_upstream(&theme, &current.upstream, &proxies)?;
+    let fallback = prompt_fallback(&theme, &current.fallback, &proxies)?;
 
     Ok(AppConfig {
         listen: ListenConfig {
@@ -212,14 +250,15 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
         },
         upstream,
         fallback,
+        proxies,
     })
 }
 
 pub fn resolve_upstream_endpoint(
-    config: &UpstreamConfig,
+    config: &AppConfig,
     gateway_ip: Option<IpAddr>,
 ) -> Option<ProxyEndpoint> {
-    match config {
+    match &config.upstream {
         UpstreamConfig::None => None,
         UpstreamConfig::Gateway {
             protocol,
@@ -232,6 +271,7 @@ pub fn resolve_upstream_endpoint(
             port: *port,
             connect_timeout_ms: *connect_timeout_ms,
         }),
+        UpstreamConfig::Saved { name } => config.find_proxy(name).map(SavedProxy::endpoint),
         UpstreamConfig::Static {
             protocol,
             host,
@@ -246,9 +286,10 @@ pub fn resolve_upstream_endpoint(
     }
 }
 
-pub fn resolve_fallback_endpoint(config: &FallbackConfig) -> Option<ProxyEndpoint> {
-    match config {
+pub fn resolve_fallback_endpoint(config: &AppConfig) -> Option<ProxyEndpoint> {
+    match &config.fallback {
         FallbackConfig::None | FallbackConfig::Direct => None,
+        FallbackConfig::Saved { name } => config.find_proxy(name).map(SavedProxy::endpoint),
         FallbackConfig::Static {
             protocol,
             host,
@@ -288,22 +329,32 @@ pub fn summarize(config: &AppConfig, gateway: Option<IpAddr>) -> String {
     )
 }
 
-fn prompt_upstream(theme: &ColorfulTheme, current: &UpstreamConfig) -> Result<UpstreamConfig> {
-    let modes = ["none", "gateway", "static"];
-    let current_index = match current {
-        UpstreamConfig::None => 0,
-        UpstreamConfig::Gateway { .. } => 1,
-        UpstreamConfig::Static { .. } => 2,
-    };
+fn prompt_upstream(
+    theme: &ColorfulTheme,
+    current: &UpstreamConfig,
+    proxies: &[SavedProxy],
+) -> Result<UpstreamConfig> {
+    let mut modes = vec![UpstreamKind::None, UpstreamKind::Gateway];
+    if !proxies.is_empty() {
+        modes.push(UpstreamKind::Saved);
+    }
+    modes.push(UpstreamKind::Static);
+
+    let current_kind = UpstreamKind::of(current);
+    let current_index = modes
+        .iter()
+        .position(|kind| *kind == current_kind)
+        .unwrap_or(0);
+    let labels: Vec<&str> = modes.iter().map(|kind| kind.label()).collect();
     let mode = Select::with_theme(theme)
         .with_prompt("Upstream type")
         .default(current_index)
-        .items(modes)
+        .items(&labels)
         .interact()?;
 
-    match mode {
-        0 => Ok(UpstreamConfig::None),
-        1 => {
+    match modes[mode] {
+        UpstreamKind::None => Ok(UpstreamConfig::None),
+        UpstreamKind::Gateway => {
             let protocol = prompt_protocol(theme, protocol_from_upstream(current))?;
             let port = Input::with_theme(theme)
                 .with_prompt("Gateway upstream port")
@@ -322,7 +373,15 @@ fn prompt_upstream(theme: &ColorfulTheme, current: &UpstreamConfig) -> Result<Up
                 connect_timeout_ms: default_connect_timeout_ms(),
             })
         }
-        2 => {
+        UpstreamKind::Saved => {
+            let current_name = match current {
+                UpstreamConfig::Saved { name } => Some(name.as_str()),
+                _ => None,
+            };
+            let name = prompt_saved_selection(theme, "Upstream proxy", proxies, current_name)?;
+            Ok(UpstreamConfig::Saved { name })
+        }
+        UpstreamKind::Static => {
             let protocol = prompt_protocol(theme, protocol_from_upstream(current))?;
             let host = Input::with_theme(theme)
                 .with_prompt("Static upstream host")
@@ -339,27 +398,44 @@ fn prompt_upstream(theme: &ColorfulTheme, current: &UpstreamConfig) -> Result<Up
                 connect_timeout_ms: default_connect_timeout_ms(),
             })
         }
-        _ => bail!("tipo de upstream no soportado"),
     }
 }
 
-fn prompt_fallback(theme: &ColorfulTheme, current: &FallbackConfig) -> Result<FallbackConfig> {
-    let modes = ["none", "direct", "static"];
-    let current_index = match current {
-        FallbackConfig::None => 0,
-        FallbackConfig::Direct => 1,
-        FallbackConfig::Static { .. } => 2,
-    };
+fn prompt_fallback(
+    theme: &ColorfulTheme,
+    current: &FallbackConfig,
+    proxies: &[SavedProxy],
+) -> Result<FallbackConfig> {
+    let mut modes = vec![FallbackKind::None, FallbackKind::Direct];
+    if !proxies.is_empty() {
+        modes.push(FallbackKind::Saved);
+    }
+    modes.push(FallbackKind::Static);
+
+    let current_kind = FallbackKind::of(current);
+    let current_index = modes
+        .iter()
+        .position(|kind| *kind == current_kind)
+        .unwrap_or(0);
+    let labels: Vec<&str> = modes.iter().map(|kind| kind.label()).collect();
     let mode = Select::with_theme(theme)
         .with_prompt("Fallback type")
         .default(current_index)
-        .items(modes)
+        .items(&labels)
         .interact()?;
 
-    match mode {
-        0 => Ok(FallbackConfig::None),
-        1 => Ok(FallbackConfig::Direct),
-        2 => {
+    match modes[mode] {
+        FallbackKind::None => Ok(FallbackConfig::None),
+        FallbackKind::Direct => Ok(FallbackConfig::Direct),
+        FallbackKind::Saved => {
+            let current_name = match current {
+                FallbackConfig::Saved { name } => Some(name.as_str()),
+                _ => None,
+            };
+            let name = prompt_saved_selection(theme, "Fallback proxy", proxies, current_name)?;
+            Ok(FallbackConfig::Saved { name })
+        }
+        FallbackKind::Static => {
             let protocol = prompt_protocol(theme, protocol_from_fallback(current))?;
             let host = Input::with_theme(theme)
                 .with_prompt("Fallback host")
@@ -376,8 +452,187 @@ fn prompt_fallback(theme: &ColorfulTheme, current: &FallbackConfig) -> Result<Fa
                 connect_timeout_ms: default_connect_timeout_ms(),
             })
         }
-        _ => bail!("tipo de fallback no soportado"),
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UpstreamKind {
+    None,
+    Gateway,
+    Saved,
+    Static,
+}
+
+impl UpstreamKind {
+    fn of(config: &UpstreamConfig) -> Self {
+        match config {
+            UpstreamConfig::None => Self::None,
+            UpstreamConfig::Gateway { .. } => Self::Gateway,
+            UpstreamConfig::Saved { .. } => Self::Saved,
+            UpstreamConfig::Static { .. } => Self::Static,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Gateway => "gateway",
+            Self::Saved => "saved (lista de proxies)",
+            Self::Static => "static",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FallbackKind {
+    None,
+    Direct,
+    Saved,
+    Static,
+}
+
+impl FallbackKind {
+    fn of(config: &FallbackConfig) -> Self {
+        match config {
+            FallbackConfig::None => Self::None,
+            FallbackConfig::Direct => Self::Direct,
+            FallbackConfig::Saved { .. } => Self::Saved,
+            FallbackConfig::Static { .. } => Self::Static,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Direct => "direct",
+            Self::Saved => "saved (lista de proxies)",
+            Self::Static => "static",
+        }
+    }
+}
+
+fn prompt_proxy_list(theme: &ColorfulTheme, mut proxies: Vec<SavedProxy>) -> Result<Vec<SavedProxy>> {
+    loop {
+        let mut items: Vec<String> = proxies.iter().map(describe_saved_proxy).collect();
+        let add_index = items.len();
+        items.push("+ añadir proxy".to_string());
+        let remove_index = items.len();
+        if !proxies.is_empty() {
+            items.push("- eliminar proxy".to_string());
+        }
+        let done_index = items.len();
+        items.push("continuar".to_string());
+
+        let selection = Select::with_theme(theme)
+            .with_prompt("Proxies guardados (edita, añade o continúa)")
+            .default(done_index)
+            .items(&items)
+            .interact()?;
+
+        if selection == done_index {
+            return Ok(proxies);
+        }
+        if selection == add_index {
+            let proxy = prompt_saved_proxy(theme, None)?;
+            match proxies.iter().position(|item| item.name == proxy.name) {
+                Some(index) => proxies[index] = proxy,
+                None => proxies.push(proxy),
+            }
+            continue;
+        }
+        if !proxies.is_empty() && selection == remove_index {
+            let labels: Vec<String> = proxies.iter().map(describe_saved_proxy).collect();
+            let target = Select::with_theme(theme)
+                .with_prompt("¿Qué proxy quieres eliminar?")
+                .default(0)
+                .items(&labels)
+                .interact()?;
+            proxies.remove(target);
+            continue;
+        }
+
+        let updated = prompt_saved_proxy(theme, Some(&proxies[selection]))?;
+        proxies[selection] = updated;
+    }
+}
+
+fn prompt_saved_proxy(theme: &ColorfulTheme, current: Option<&SavedProxy>) -> Result<SavedProxy> {
+    let name: String = Input::with_theme(theme)
+        .with_prompt("Nombre del proxy")
+        .default(
+            current
+                .map(|proxy| proxy.name.clone())
+                .unwrap_or_else(|| "proxy".to_string()),
+        )
+        .interact_text()?;
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        bail!("el nombre del proxy no puede estar vacío");
+    }
+
+    let protocol = prompt_protocol(
+        theme,
+        current.map(|proxy| proxy.protocol).unwrap_or_default(),
+    )?;
+    let host: String = Input::with_theme(theme)
+        .with_prompt("Host")
+        .default(
+            current
+                .map(|proxy| proxy.host.clone())
+                .unwrap_or_else(|| "127.0.0.1".to_string()),
+        )
+        .interact_text()?;
+    let port: u16 = Input::with_theme(theme)
+        .with_prompt("Puerto")
+        .default(current.map(|proxy| proxy.port).unwrap_or(8080))
+        .interact_text()?;
+    let connect_timeout_ms: u64 = Input::with_theme(theme)
+        .with_prompt("Connect timeout (ms)")
+        .default(
+            current
+                .map(|proxy| proxy.connect_timeout_ms)
+                .unwrap_or_else(default_connect_timeout_ms),
+        )
+        .interact_text()?;
+
+    Ok(SavedProxy {
+        name,
+        protocol,
+        host: host.trim().to_string(),
+        port,
+        connect_timeout_ms,
+    })
+}
+
+fn prompt_saved_selection(
+    theme: &ColorfulTheme,
+    prompt: &str,
+    proxies: &[SavedProxy],
+    current_name: Option<&str>,
+) -> Result<String> {
+    if proxies.is_empty() {
+        bail!("no hay proxies guardados");
+    }
+    let labels: Vec<String> = proxies.iter().map(describe_saved_proxy).collect();
+    let default_index = current_name
+        .and_then(|name| proxies.iter().position(|proxy| proxy.name == name))
+        .unwrap_or(0);
+    let selection = Select::with_theme(theme)
+        .with_prompt(prompt)
+        .default(default_index)
+        .items(&labels)
+        .interact()?;
+    Ok(proxies[selection].name.clone())
+}
+
+fn describe_saved_proxy(proxy: &SavedProxy) -> String {
+    format!(
+        "{} ({}://{}:{})",
+        proxy.name,
+        protocol_name(proxy.protocol),
+        proxy.host,
+        proxy.port
+    )
 }
 
 fn prompt_protocol(theme: &ColorfulTheme, current: ProxyProtocol) -> Result<ProxyProtocol> {
@@ -403,7 +658,7 @@ fn protocol_from_upstream(config: &UpstreamConfig) -> ProxyProtocol {
         UpstreamConfig::Gateway { protocol, .. } | UpstreamConfig::Static { protocol, .. } => {
             *protocol
         }
-        UpstreamConfig::None => ProxyProtocol::Http,
+        UpstreamConfig::None | UpstreamConfig::Saved { .. } => ProxyProtocol::Http,
     }
 }
 
@@ -431,7 +686,7 @@ fn host_from_fallback(config: &FallbackConfig) -> Option<String> {
 fn port_from_upstream(config: &UpstreamConfig) -> Option<u16> {
     match config {
         UpstreamConfig::Gateway { port, .. } | UpstreamConfig::Static { port, .. } => Some(*port),
-        UpstreamConfig::None => None,
+        UpstreamConfig::None | UpstreamConfig::Saved { .. } => None,
     }
 }
 
@@ -457,6 +712,7 @@ fn describe_upstream(config: &UpstreamConfig) -> String {
         UpstreamConfig::Gateway { protocol, port, .. } => {
             format!("gateway:{}:{}", protocol_name(*protocol), port)
         }
+        UpstreamConfig::Saved { name } => format!("saved:{name}"),
         UpstreamConfig::Static {
             protocol,
             host,
@@ -470,6 +726,7 @@ fn describe_fallback(config: &FallbackConfig) -> String {
     match config {
         FallbackConfig::None => "none".to_string(),
         FallbackConfig::Direct => "direct".to_string(),
+        FallbackConfig::Saved { name } => format!("saved:{name}"),
         FallbackConfig::Static {
             protocol,
             host,
