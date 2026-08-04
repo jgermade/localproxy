@@ -1,73 +1,70 @@
 # zproxy
 
-zproxy es un proxy local escrito en Rust que escucha en localhost y reenvía tráfico HTTP y HTTPS usando una cadena de resolución configurable:
+zproxy is a local proxy daemon written in Rust. It listens on localhost and forwards HTTP and HTTPS traffic through a configurable resolution chain:
 
-1. upstream principal opcional
-2. fallback opcional
-3. salida directa cuando la configuración lo permite
+1. optional primary upstream
+2. optional fallback
+3. direct connection when allowed by the configuration
 
-La implementación actual ya soporta:
+## Features
 
-- Proxy HTTP local con soporte para peticiones HTTP normales.
-- Soporte CONNECT para túneles HTTPS sin MITM.
-- Upstream estático por HTTP o SOCKS5.
-- Upstream dinámico basado en el gateway por defecto del sistema.
-- Fallback estático o directo.
-- Daemon con pidfile, lockfile y socket Unix de control.
-- Wizard interactivo para generar la configuración TOML.
+- HTTP proxy with support for plain HTTP requests.
+- CONNECT tunneling for HTTPS traffic (no MITM).
+- Static HTTP or SOCKS5 upstream.
+- Dynamic upstream based on the system default gateway.
+- Static or direct fallback.
+- Daemon with pidfile, lockfile and Unix control socket.
+- Interactive wizard to generate the TOML configuration.
+- User-level service management (LaunchAgent on macOS, systemd --user on Linux).
+- Detached background mode without a registered service.
 
-La implementación actual no incluye todavía:
+Not yet implemented:
 
-- Registro automático como proxy del sistema.
-- Plantillas de LaunchAgent o systemd.
-- Lanzador para .zshrc o .bashrc.
-- Reglas de bypass por dominio o IP.
-- Encadenamiento multinivel de fallbacks.
-- Autenticación contra upstream proxies.
+- Automatic system proxy registration.
+- Per-domain or per-CIDR bypass rules.
+- Multi-level fallback chains.
+- Upstream proxy authentication.
 
-## Estructura
+## Documentation
 
-- [docs/quickstart.md](docs/quickstart.md): instalación mínima y primer arranque.
-- [docs/configuration.md](docs/configuration.md): formato de configuración y ejemplos.
-- [docs/operations.md](docs/operations.md): daemon, socket de control, logs y operación diaria.
-- [macos-proxy-rust-design.md](macos-proxy-rust-design.md): diseño original y backlog de evolución.
+- [docs/quickstart.md](docs/quickstart.md) — build, first run and basic usage.
+- [docs/configuration.md](docs/configuration.md) — config format, wizard walkthrough and examples.
+- [docs/operations.md](docs/operations.md) — daemon modes, service management, logs and daily operations.
+- [macos-proxy-rust-design.md](macos-proxy-rust-design.md) — original design and evolution backlog.
 
-## Comandos disponibles
+## Commands
 
-El binario expone estos subcomandos:
+| Command | Description |
+|---|---|
+| `zproxy daemon` | Start the daemon and the proxy listener in the foreground. |
+| `zproxy config` | Open the interactive wizard, save config and hot-reload the daemon. |
+| `zproxy status` | Query the running daemon via the Unix control socket. |
+| `zproxy reload` | Reload config from disk without restarting the process. |
+| `zproxy stop` | Stop the daemon. |
+| `zproxy start` | Start the service if installed; otherwise ask to run detached. |
+| `zproxy start --detached` | Start `zproxy daemon` in the background without registering a service. |
+| `zproxy logs [--lines N] [--follow] [--detached]` | Show logs from the service or the detached log file. |
+| `zproxy paths` | Print config, state, socket and pid file paths. |
+| `zproxy service install` | Register as a user-level service (LaunchAgent / systemd --user). |
+| `zproxy service start` | Start the registered service. |
+| `zproxy service restart` | Restart the registered service. |
+| `zproxy service status` | Query the service manager (installed / running state). |
+| `zproxy service stop` | Stop the registered service. |
+| `zproxy service logs [--lines N] [--follow]` | Show service logs (tail/journalctl). |
+| `zproxy service uninstall` | Unregister the user-level service. |
 
-- `zproxy daemon`: arranca el daemon y el listener del proxy local.
-- `zproxy config`: abre el wizard interactivo, guarda la config y pide recarga al daemon si está corriendo.
-- `zproxy status`: consulta el estado actual por el socket Unix.
-- `zproxy reload`: recarga la configuración desde disco.
-- `zproxy stop`: detiene el daemon.
-- `zproxy service install`: instala el daemon como servicio de usuario (LaunchAgent en macOS, systemd --user en Linux).
-- `zproxy service start`: inicia el servicio instalado.
-- `zproxy service restart`: reinicia el servicio instalado.
-- `zproxy service status`: consulta estado del gestor de servicios (instalado/activo).
-- `zproxy service stop`: detiene el servicio instalado.
-- `zproxy service logs [--lines N] [--follow]`: muestra logs del servicio (tail/journalctl según plataforma).
-- `zproxy service uninstall`: desinstala el servicio de usuario.
-- `zproxy start`: si hay servicio instalado, lo inicia; si no, pregunta si quieres arrancar en modo detached.
-- `zproxy start --detached`: arranca `zproxy daemon` en background sin instalar servicio.
-- `zproxy logs [--lines N] [--follow] [--detached]`: muestra logs del servicio si está instalado; si no, hace tail de `zproxy.log` (modo detached).
-- `zproxy paths`: imprime rutas de config, estado, socket y pidfile.
+## Default paths
 
-## Resumen operativo
+| Purpose | Path |
+|---|---|
+| Configuration | `~/.config/zproxy/config.toml` |
+| State directory | `~/.local/state/zproxy` |
+| Control socket | `~/.local/state/zproxy/zproxy.sock` |
+| PID file | `~/.local/state/zproxy/zproxy.pid` |
+| Lock file | `~/.local/state/zproxy/zproxy.lock` |
+| Log file (detached) | `~/.local/state/zproxy/zproxy.log` |
 
-El daemon usa estas rutas por defecto:
-
-- Configuración: `~/.config/zproxy/config.toml`
-- Estado: `~/.local/state/zproxy`
-- Socket de control: `~/.local/state/zproxy/zproxy.sock`
-- PID: `~/.local/state/zproxy/zproxy.pid`
-- Lock: `~/.local/state/zproxy/zproxy.lock`
-
-Cuando el upstream se configura como `gateway`, zproxy detecta periódicamente la IP del gateway por defecto y reconstruye el upstream efectivo como `gateway_ip:port`. En macOS usa `route -n get default`; en Linux intenta primero `/proc/net/route` y, si no basta, `ip route show default`.
-
-## Desarrollo
-
-Comandos útiles:
+## Development
 
 ```bash
 cargo fmt --check
@@ -77,12 +74,17 @@ cargo run -- config
 cargo run -- daemon
 ```
 
-Si el cache global de Cargo queda bloqueado por otro proceso del sistema, se puede aislar la comprobación con:
+If the global Cargo cache is locked by another process, isolate it:
 
 ```bash
 CARGO_HOME=$PWD/.cargo-home cargo check
 ```
 
-## Estado del proyecto
+## CI / Release
 
-Esta base ya sirve como prototipo funcional para probar routing local, CONNECT y resolución de upstream/fallback. La parte más incompleta hoy está en la integración con el sistema operativo y el packaging de servicio.
+| Workflow | Trigger |
+|---|---|
+| [build.yml](.github/workflows/build.yml) | push / PR to `main` |
+| [release.yml](.github/workflows/release.yml) | manual dispatch with `patch` / `minor` / `major` input |
+
+`release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries attached.

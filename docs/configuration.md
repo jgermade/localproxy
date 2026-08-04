@@ -1,8 +1,20 @@
 # Configuration
 
-zproxy guarda la configuración en formato TOML en `~/.config/zproxy/config.toml`.
+zproxy stores its configuration as TOML at `~/.config/zproxy/config.toml`.
 
-## Esquema general
+Run the interactive wizard at any time:
+
+```bash
+zproxy config
+```
+
+The wizard saves the file and, if the daemon is running, hot-reloads the configuration without restarting the process. To reload manually:
+
+```bash
+zproxy reload
+```
+
+## Schema overview
 
 ```toml
 [listen]
@@ -16,51 +28,36 @@ type = "none"
 type = "direct"
 ```
 
-## Sección listen
+## [listen]
 
-Parámetros soportados:
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `host` | IP string | `"127.0.0.1"` | Local bind address. |
+| `port` | integer | `8888` | Local bind port. |
 
-- `host`: IP de escucha local.
-- `port`: puerto de escucha local.
+## [upstream]
 
-Ejemplo:
+Three types are supported: `none`, `gateway`, `static`.
 
-```toml
-[listen]
-host = "127.0.0.1"
-port = 8888
-```
+### upstream = none
 
-## Sección upstream
-
-Tipos soportados:
-
-- `none`
-- `gateway`
-- `static`
-
-### Upstream none
-
-No usa upstream principal.
+No upstream proxy. Traffic is forwarded only if the fallback allows it.
 
 ```toml
 [upstream]
 type = "none"
 ```
 
-### Upstream gateway
+### upstream = gateway
 
-Construye el upstream como `gateway_actual:port` y vuelve a detectar el gateway periódicamente.
+Builds the upstream address as `<default_gateway_ip>:<port>`. The daemon re-detects the gateway at `poll_interval_secs` intervals.
 
-Campos soportados:
-
-- `type = "gateway"`
-- `protocol = "http" | "socks5"`
-- `port`
-- `poll_interval_secs`
-- `connect_timeout_ms`
-
-Ejemplo:
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `protocol` | `"http"` \| `"socks5"` | — | Upstream proxy protocol. |
+| `port` | integer | — | Port on the gateway host. |
+| `poll_interval_secs` | integer | — | Gateway re-detection interval. |
+| `connect_timeout_ms` | integer | `3000` | Connection timeout in milliseconds. |
 
 ```toml
 [upstream]
@@ -71,17 +68,16 @@ poll_interval_secs = 5
 connect_timeout_ms = 3000
 ```
 
-### Upstream static
+### upstream = static
 
-Campos soportados:
+Fixed upstream proxy address.
 
-- `type = "static"`
-- `protocol = "http" | "socks5"`
-- `host`
-- `port`
-- `connect_timeout_ms`
-
-Ejemplo:
+| Field | Type | Description |
+|---|---|---|
+| `protocol` | `"http"` \| `"socks5"` | Upstream proxy protocol. |
+| `host` | string | Upstream hostname or IP. |
+| `port` | integer | Upstream port. |
+| `connect_timeout_ms` | integer | Connection timeout in milliseconds. |
 
 ```toml
 [upstream]
@@ -92,45 +88,38 @@ port = 1080
 connect_timeout_ms = 3000
 ```
 
-## Sección fallback
+## [fallback]
 
-Tipos soportados:
+Three types are supported: `none`, `direct`, `static`.
 
-- `none`
-- `direct`
-- `static`
+### fallback = none
 
-### Fallback none
-
-Si el upstream falla y el fallback es `none`, la conexión termina con error.
+If the upstream fails, the connection is terminated with an error.
 
 ```toml
 [fallback]
 type = "none"
 ```
 
-### Fallback direct
+### fallback = direct
 
-Si el upstream falla, zproxy intenta conectar directamente al destino.
+If the upstream fails, zproxy attempts a direct connection to the destination.
 
 ```toml
 [fallback]
 type = "direct"
 ```
 
-### Fallback static
+### fallback = static
 
-Si el upstream falla, zproxy intenta un segundo proxy estático.
+If the upstream fails, zproxy tries a second fixed proxy.
 
-Campos soportados:
-
-- `type = "static"`
-- `protocol = "http" | "socks5"`
-- `host`
-- `port`
-- `connect_timeout_ms`
-
-Ejemplo:
+| Field | Type | Description |
+|---|---|---|
+| `protocol` | `"http"` \| `"socks5"` | Fallback proxy protocol. |
+| `host` | string | Fallback hostname or IP. |
+| `port` | integer | Fallback port. |
+| `connect_timeout_ms` | integer | Connection timeout in milliseconds. |
 
 ```toml
 [fallback]
@@ -141,18 +130,18 @@ port = 8080
 connect_timeout_ms = 3000
 ```
 
-## Orden de resolución real
+## Resolution order
 
-La lógica efectiva del binario actual es esta:
+1. Try the primary upstream (if resolvable).
+2. Try the static fallback (if configured as `static`).
+3. Attempt a direct connection if `fallback = "direct"` or no upstream is configured.
+4. Return `502 Bad Gateway` to the client if nothing succeeds.
 
-1. Si hay upstream resoluble, lo intenta primero.
-2. Si hay fallback estático, lo intenta después.
-3. Si el fallback es `direct` o no hay upstream configurado, intenta salida directa.
-4. Si nada funciona, devuelve `502 Bad Gateway` al cliente.
+## Complete examples
 
-## Ejemplos completos
+### Direct mode
 
-### Proxy local con salida directa
+No upstream, direct fallback. Useful for testing connectivity without a proxy.
 
 ```toml
 [listen]
@@ -166,7 +155,9 @@ type = "none"
 type = "direct"
 ```
 
-### Proxy local con upstream gateway y fallback directo
+### Gateway upstream with direct fallback
+
+Route through whatever proxy the corporate network gateway exposes, fall back to direct when off-network.
 
 ```toml
 [listen]
@@ -184,7 +175,7 @@ connect_timeout_ms = 3000
 type = "direct"
 ```
 
-### Proxy local con upstream SOCKS5 estático y fallback HTTP estático
+### Static SOCKS5 upstream with static HTTP fallback
 
 ```toml
 [listen]
@@ -206,8 +197,8 @@ port = 8080
 connect_timeout_ms = 3000
 ```
 
-## Consideraciones
+## Notes
 
-- El wizard actual siempre propone `connect_timeout_ms = 3000`; si necesitas otro valor, edita el TOML manualmente.
-- No hay validaciones avanzadas de reachability ni de autenticación del upstream.
-- No existen reglas de bypass por dominio, CIDR o sufijo.
+- The wizard always suggests `connect_timeout_ms = 3000`. Edit the TOML file directly to use a different value.
+- There are no reachability checks or upstream authentication.
+- Per-domain, per-CIDR and per-suffix bypass rules are not implemented.

@@ -1,119 +1,149 @@
 # Quickstart
 
-## Requisitos
+## Requirements
 
-- Rust toolchain reciente con `cargo`.
-- macOS o Linux.
-- Acceso a red para descargar dependencias de crates.io en la primera compilación.
+- A recent Rust toolchain with `cargo`.
+- macOS or Linux.
+- Internet access to download crates on the first build.
 
-## Compilar
+## Build
 
 ```bash
 cargo build
 ```
 
-Para un binario optimizado:
+Optimised release binary:
 
 ```bash
 cargo build --release
 ```
 
-## Ver rutas usadas por zproxy
+## Check default paths
 
 ```bash
+zproxy paths
+# or during development:
 cargo run -- paths
 ```
 
-Salida esperada, con tus rutas reales:
+Expected output:
 
 ```text
-config: /Users/tu-usuario/.config/zproxy/config.toml
-state: /Users/tu-usuario/.local/state/zproxy
-socket: /Users/tu-usuario/.local/state/zproxy/zproxy.sock
-pid: /Users/tu-usuario/.local/state/zproxy/zproxy.pid
+config: /Users/you/.config/zproxy/config.toml
+state:  /Users/you/.local/state/zproxy
+socket: /Users/you/.local/state/zproxy/zproxy.sock
+pid:    /Users/you/.local/state/zproxy/zproxy.pid
 ```
 
-## Crear la configuración inicial
+## Create the initial configuration
 
 ```bash
-cargo run -- config
+zproxy config
 ```
 
-El wizard pregunta por:
+The interactive wizard asks for:
 
-- host y puerto de escucha
-- tipo de upstream: `none`, `gateway` o `static`
-- protocolo del proxy upstream: `http` o `socks5`
-- tipo de fallback: `none`, `direct` o `static`
+1. **Listen address** — host and port for the local proxy (default `127.0.0.1:8888`).
+2. **Upstream type** — `none`, `gateway` or `static`.
+3. **Upstream protocol** — `http` or `socks5` (only for `gateway` and `static`).
+4. **Fallback type** — `none`, `direct` or `static`.
 
-Si el daemon ya está corriendo, el wizard intenta pedir una recarga automática por el socket de control.
+If the daemon is already running, the wizard automatically sends a `reload` command through the control socket so the new config takes effect immediately.
 
-## Arrancar el daemon
+### Wizard walkthrough examples
+
+**Direct mode** (no upstream, direct fallback):
+
+```
+? Listen host › 127.0.0.1
+? Listen port › 8888
+? Upstream type › none
+? Fallback type › direct
+Config saved. Daemon reloaded.
+```
+
+**Gateway upstream** (route through current default gateway):
+
+```
+? Listen host › 127.0.0.1
+? Listen port › 8888
+? Upstream type › gateway
+? Upstream protocol › http
+? Upstream port › 8080
+? Poll interval (secs) › 5
+? Connect timeout (ms) › 3000
+? Fallback type › direct
+Config saved. Daemon reloaded.
+```
+
+**Static SOCKS5 upstream** (fixed upstream proxy):
+
+```
+? Listen host › 127.0.0.1
+? Listen port › 8888
+? Upstream type › static
+? Upstream protocol › socks5
+? Upstream host › 127.0.0.1
+? Upstream port › 1080
+? Connect timeout (ms) › 3000
+? Fallback type › none
+Config saved. Daemon reloaded.
+```
+
+## Start the daemon
+
+Recommended for daily use (registers a user-level service):
 
 ```bash
-cargo run -- daemon
+zproxy service install
+zproxy start
 ```
 
-Alternativa recomendada para uso diario:
+Without registering a service:
 
 ```bash
-cargo run -- service install
-cargo run -- start
+zproxy start --detached
 ```
 
-Si no quieres instalar servicio:
+For development / foreground:
 
 ```bash
-cargo run -- start --detached
+zproxy daemon
 ```
 
-Qué hace este comando:
+## Test the proxy
 
-- crea las carpetas de config y estado si no existen
-- toma un lock exclusivo para evitar varias instancias
-- escribe pidfile
-- arranca el detector de gateway si aplica
-- abre el socket Unix de control
-- abre el listener del proxy local
-
-## Probar el proxy
-
-Con salida directa:
+Plain HTTP:
 
 ```bash
 curl -x http://127.0.0.1:8888 http://example.com
 ```
 
-Con CONNECT para HTTPS:
+HTTPS via CONNECT tunnel:
 
 ```bash
 curl -x http://127.0.0.1:8888 https://example.com
 ```
 
-Si vas a probar otro puerto u host local, ajusta la URL del proxy a la configuración elegida.
-
-## Consultar estado
-
-En otra terminal:
+## Query status
 
 ```bash
-cargo run -- status
+zproxy status
 ```
 
-Ejemplo de salida:
+Example output:
 
 ```text
 listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 ```
 
-## Detener el daemon
+## Stop the daemon
 
 ```bash
-cargo run -- stop
+zproxy stop
 ```
 
-## Limitaciones prácticas del quickstart
+## Notes
 
-- No hay integración automática con Ajustes de Red de macOS ni con el entorno de escritorio en Linux.
-- No hay wrapper para dejarlo lanzado desde `.zshrc` o `.bashrc`.
-- La primera compilación depende de poder descargar crates desde internet.
+- The first build requires internet access to fetch crates from crates.io.
+- There is no automatic integration with macOS Network Preferences or Linux desktop environments.

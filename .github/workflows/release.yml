@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    name: Bump version & tag
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      tag: ${{ steps.bump.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute new version
+        id: bump
+        run: |
+          current=$(grep '^version' Cargo.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+          echo "Current version: $current"
+          IFS='.' read -r major minor patch <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          new_version="${major}.${minor}.${patch}"
+          echo "New version: $new_version"
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$new_version" >> "$GITHUB_OUTPUT"
+
+      - name: Update Cargo.toml
+        run: |
+          sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.new_version }}\"/" Cargo.toml
+
+      - name: Update Cargo.lock
+        run: cargo update --workspace
+
+      - name: Commit & tag
+        run: |
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore: release v${{ steps.bump.outputs.new_version }}"
+          git tag "${{ steps.bump.outputs.tag }}"
+          git push origin main "${{ steps.bump.outputs.tag }}"
+
+  build:
+    name: Build release binaries
+    needs: bump-version
+    uses: ./.github/workflows/build.yml
+    with:
+      upload-artifacts: true
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [bump-version, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          tag="${{ needs.bump-version.outputs.tag }}"
+          prev=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
+          if [ -z "$prev" ]; then
+            log=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            log=$(git log --pretty=format:"- %s (%h)" "${prev}..HEAD")
+          fi
+          {
+            echo "## What's changed"
+            echo ""
+            echo "$log"
+          } > release_notes.md
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.bump-version.outputs.tag }}
+          name: "zproxy ${{ needs.bump-version.outputs.tag }}"
+          body_path: release_notes.md
+          files: dist/**/*
+          draft: false
+          prerelease: false
