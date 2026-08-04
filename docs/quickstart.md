@@ -2,7 +2,19 @@
 
 ## Install
 
-The fastest path is the prebuilt binary attached to the latest release:
+One line installs the binary for your platform into `~/.local/bin` and wires up your shell profile:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+```
+
+```bash
+wget -qO- https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+```
+
+Options go after `-s --`, e.g. `bash -s -- --dir /usr/local/bin --no-modify-profile`.
+
+Manual alternative — grab the prebuilt binary attached to the latest release:
 
 ```bash
 # macOS (Apple Silicon)
@@ -13,7 +25,8 @@ export PATH="$HOME/.local/bin:$PATH"
 ```
 
 Other assets: `zproxy-macos-x86_64`, `zproxy-linux-x86_64`, `zproxy-linux-aarch64`. Full details
-(platform detection, Gatekeeper, upgrades, uninstall) in [installation.md](installation.md).
+(installer options, platform detection, Gatekeeper, upgrades, uninstall) in
+[installation.md](installation.md).
 
 ## Build from source
 
@@ -152,9 +165,10 @@ export no_proxy="localhost,127.0.0.1,::1"
 
 ### Make it permanent (zsh / bash)
 
-Add this block to `~/.zshrc` (zsh), `~/.bashrc` (bash on Linux) or `~/.bash_profile` (bash login
-shell on macOS). It starts the daemon if it is not already running and exports every variable the
-usual tooling looks at:
+The one-line installer already adds this block. Add it by hand to `~/.zshrc` (zsh), `~/.bashrc`
+(bash on Linux) or `~/.bash_profile` (bash login shell on macOS) if you installed manually or used
+`--no-modify-profile`. It starts the daemon if it is not already running and exports every variable
+the usual tooling looks at:
 
 ```bash
 # --- zproxy ---------------------------------------------------------------

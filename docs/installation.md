@@ -24,7 +24,47 @@ uname -s        # Darwin | Linux
 uname -m        # arm64 / aarch64 | x86_64
 ```
 
-## Install the latest release
+## One-line install
+
+[install.sh](../install.sh) detects the platform, downloads the matching asset, installs it into
+`~/.local/bin` and adds the proxy block to your shell profile:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+```
+
+```bash
+wget -qO- https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+```
+
+Options are passed after `-s --`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh \
+  | bash -s -- --version v0.1.1 --dir /usr/local/bin --no-modify-profile
+```
+
+| Option | Environment variable | Default |
+|---|---|---|
+| `--version <vX.Y.Z>` | `ZPROXY_VERSION` | latest release |
+| `--dir <path>` | `ZPROXY_INSTALL_DIR` | `~/.local/bin` |
+| `--profile <path>` | `ZPROXY_PROFILE` | `~/.zshrc`, `~/.bashrc` or `~/.bash_profile` |
+| `--no-modify-profile` | `ZPROXY_NO_MODIFY_PROFILE` | profile is updated |
+| — | `GITHUB_TOKEN` / `ZPROXY_GITHUB_TOKEN` | unset (required only for a private repo) |
+
+Behaviour worth knowing:
+
+- The binary is staged inside the install directory and moved into place with an atomic rename, so
+  upgrading works while an older zproxy is still running.
+- The macOS quarantine attribute is cleared automatically.
+- The downloaded binary is executed once (`zproxy --version`) before being installed.
+- The shell profile is only touched when the `# --- zproxy ---` marker is missing, so re-running the
+  installer never duplicates the block.
+- Re-run the same command to upgrade.
+
+The rest of this page describes the manual equivalent.
+
+## Install the latest release manually
 
 The snippet below detects the platform, downloads the matching asset from the latest release and
 installs it into `~/.local/bin`:

@@ -27,7 +27,26 @@ Not yet implemented:
 
 ## Install
 
-Download the binary for your platform from the [latest release](https://github.com/jgermade/zproxy/releases/latest):
+One line, like nvm or oh-my-zsh — detects your platform, installs into `~/.local/bin` and sets up
+your shell profile:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+```
+
+```bash
+wget -qO- https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh | bash
+```
+
+Options go after `-s --` (`--version`, `--dir`, `--profile`, `--no-modify-profile`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh \
+  | bash -s -- --dir /usr/local/bin --no-modify-profile
+```
+
+Re-run the same command to upgrade. Prefer doing it by hand? Download the binary for your platform
+from the [latest release](https://github.com/jgermade/zproxy/releases/latest):
 
 ```bash
 # macOS (Apple Silicon)
@@ -43,8 +62,9 @@ Gatekeeper notes, upgrades and uninstall.
 ## Shell setup (zsh / bash)
 
 zproxy does not change the system network settings: tools pick it up through the `http_proxy` /
-`https_proxy` environment variables. Add this to `~/.zshrc` (zsh) or `~/.bashrc` / `~/.bash_profile`
-(bash) to start the daemon when it is not running and export the variables:
+`https_proxy` environment variables. The installer adds the block below for you; add it by hand to
+`~/.zshrc` (zsh) or `~/.bashrc` / `~/.bash_profile` (bash) if you used `--no-modify-profile`. It
+starts the daemon when it is not running and exports the variables:
 
 ```bash
 # --- zproxy ---------------------------------------------------------------
