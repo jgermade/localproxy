@@ -2,6 +2,9 @@
 /.cargo-home
 /.tmp
 
+# Editor settings are machine specific
+/.vscode
+
 # LLVM coverage artefacts
 *.profraw
 *.profdata

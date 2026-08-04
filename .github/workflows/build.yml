@@ -12,6 +12,14 @@ on:
         required: false
         default: false
         type: boolean
+      ref:
+        description: "Git ref to check out (defaults to the triggering ref)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -56,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -108,6 +120,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

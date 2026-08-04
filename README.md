@@ -174,3 +174,7 @@ CARGO_HOME=$PWD/.cargo-home cargo check
 before building the binaries.
 
 `release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries attached.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

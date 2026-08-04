@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/jgermade/zproxy/main/install.sh \
 | `--dir <path>` | `ZPROXY_INSTALL_DIR` | `~/.local/bin` |
 | `--profile <path>` | `ZPROXY_PROFILE` | `~/.zshrc`, `~/.bashrc` or `~/.bash_profile` |
 | `--no-modify-profile` | `ZPROXY_NO_MODIFY_PROFILE` | profile is updated |
-| — | `GITHUB_TOKEN` / `ZPROXY_GITHUB_TOKEN` | unset (required only for a private repo) |
+| — | `GITHUB_TOKEN` / `ZPROXY_GITHUB_TOKEN` | unset (only needed for private forks or to avoid API rate limits) |
 
 Behaviour worth knowing:
 

@@ -75,6 +75,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       upload-artifacts: true
+      ref: ${{ needs.bump-version.outputs.tag }}
 
   publish-release:
     name: Publish GitHub Release

@@ -2,6 +2,13 @@
 name = "zproxy"
 version = "0.1.1"
 edition = "2024"
+description = "Local proxy daemon that forwards HTTP and HTTPS traffic through a configurable upstream chain"
+license = "MIT"
+repository = "https://github.com/jgermade/zproxy"
+homepage = "https://github.com/jgermade/zproxy"
+readme = "README.md"
+keywords = ["proxy", "http", "socks5", "daemon", "cli"]
+categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
 anyhow = "1.0"
