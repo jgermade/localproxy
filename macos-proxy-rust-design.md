@@ -1,51 +1,51 @@
-# Proxy intermediario en Rust para macOS — Diseño
+# Rust Intermediary Proxy for macOS — Design
 
-## Objetivo
+## Goal
 
-Aplicación macOS escrita en Rust que actúa como:
+A macOS application written in Rust that acts as:
 
-1. **Servidor proxy local** (HTTP/HTTPS vía `CONNECT`, opcionalmente SOCKS5).
-2. **Cliente opcional de un proxy upstream**, con dos modos de resolución:
-   - **Gateway dinámico**: `default_gateway_ip:<puerto>`, detectando automáticamente cambios de IP al cambiar de red.
-   - **Estático**: host:puerto fijo.
-3. **Fallback** configurable si el upstream principal no responde (otro proxy, o conexión directa al destino).
+1. **Local proxy server** (HTTP/HTTPS via `CONNECT`, optionally SOCKS5).
+2. **Optional upstream proxy client**, with two resolution modes:
+   - **Dynamic gateway**: `default_gateway_ip:<port>`, automatically detecting IP changes when switching networks.
+   - **Static**: fixed host:port.
+3. Configurable **fallback** when the primary upstream does not respond (another proxy, or a direct connection to the destination).
 
-## Arquitectura
+## Architecture
 
 ```
-Cliente local → [App: escucha proxy en 127.0.0.1:PUERTO]
+Local client → [App: proxy listening on 127.0.0.1:PORT]
                      │
-                     ├─ intenta upstream (gateway dinámico o estático)
-                     │      └─ si falla → intenta fallback
-                     │             └─ si falla → directo al destino (según config)
-                     └─ si no hay upstream configurado → directo al destino
+                     ├─ try upstream (dynamic gateway or static)
+                     │      └─ on failure → try fallback
+                     │             └─ on failure → direct to destination (per config)
+                     └─ if no upstream configured → direct to destination
 ```
 
-Componentes:
+Components:
 
-- **Listener/proxy handler**: acepta conexiones, gestiona `CONNECT` para HTTPS (tunneling, sin MITM inicialmente).
-- **Gateway detector**: tarea independiente en background, actualiza un estado compartido (`Arc<RwLock<Option<IpAddr>>>`) con la IP del gateway actual.
-- **Upstream resolver**: en cada conexión nueva, decide a qué destino conectar según config + estado del gateway detector.
+- **Listener/proxy handler**: accepts connections, handles `CONNECT` for HTTPS (tunneling, no MITM initially).
+- **Gateway detector**: independent background task that updates a shared state (`Arc<RwLock<Option<IpAddr>>>`) with the current gateway IP.
+- **Upstream resolver**: for each new connection, decides which destination to connect to based on config + gateway detector state.
 
-## Crates propuestos
+## Proposed crates
 
-| Crate | Uso |
+| Crate | Purpose |
 |---|---|
-| `tokio` | runtime async, concurrencia de conexiones |
-| `hyper` / `hyper-util` | servidor HTTP proxy, soporte de `CONNECT` |
-| `tokio-socks` | cliente SOCKS5 si el upstream/fallback es SOCKS5 |
-| `rustls` + `tokio-rustls` | TLS si en el futuro se añade MITM opcional |
-| `system-configuration` | lectura reactiva de red en macOS (alternativa a polling con `route -n get default`) |
-| `serde` + `toml` | configuración |
-| `clap` | flags de CLI |
+| `tokio` | async runtime, connection concurrency |
+| `hyper` / `hyper-util` | HTTP proxy server, `CONNECT` support |
+| `tokio-socks` | SOCKS5 client when the upstream/fallback is SOCKS5 |
+| `rustls` + `tokio-rustls` | TLS if optional MITM is added in the future |
+| `system-configuration` | reactive network reads on macOS (alternative to polling `route -n get default`) |
+| `serde` + `toml` | configuration |
+| `clap` | CLI flags |
 
-## Detección de gateway / cambio de IP
+## Gateway detection / IP changes
 
-- **Opción simple (para empezar)**: ejecutar `route -n get default`, parsear el campo `gateway:`, comparar con el valor cacheado en un poller (`tokio::time::interval`, cada 5–10s).
-- **Opción reactiva (optimización futura)**: `SCDynamicStore`/`SCNetworkReachability` vía crate `system-configuration`, para reaccionar a eventos de red sin polling.
-- El detector corre como tarea separada del manejador de conexiones, para no bloquear conexiones activas al cambiar de red.
+- **Simple option (to start with)**: run `route -n get default`, parse the `gateway:` field, and compare it against the cached value in a poller (`tokio::time::interval`, every 5–10s).
+- **Reactive option (future optimisation)**: `SCDynamicStore`/`SCNetworkReachability` via the `system-configuration` crate, to react to network events without polling.
+- The detector runs as a task separate from the connection handler, so active connections are not blocked when the network changes.
 
-## Configuración (borrador)
+## Configuration (draft)
 
 ```toml
 [listen]
@@ -55,7 +55,7 @@ port = 8888
 [upstream]
 type = "gateway"          # "gateway" | "static" | "none"
 port = 8080
-poll_interval_secs = 5    # solo aplica si type = "gateway"
+poll_interval_secs = 5    # only applies when type = "gateway"
 
 [fallback]
 type = "static"           # "static" | "direct" | "none"
@@ -63,74 +63,74 @@ host = "1.2.3.4"
 port = 8080
 ```
 
-Lógica de conexión:
+Connection logic:
 
 ```
-upstream_actual = resolver(config.upstream, gateway_state)
-intentar conectar a upstream_actual
-  si falla (timeout / connection refused):
-    intentar fallback
-      si falla:
-        según config.fallback.type == "direct" → conectar directo al destino
-        si no → error de conexión
+current_upstream = resolve(config.upstream, gateway_state)
+try connecting to current_upstream
+  on failure (timeout / connection refused):
+    try fallback
+      on failure:
+        if config.fallback.type == "direct" → connect directly to destination
+        otherwise → connection error
 ```
 
-## macOS: consideraciones adicionales
+## macOS: additional considerations
 
-- Registrar la app como proxy del sistema: llamar a `networksetup` desde Rust, o dejar configuración manual en Ajustes de Red.
-- Para correr en background como servicio: empaquetar como **LaunchAgent**.
-- Para UI de configuración: opción **Tauri** (frontend TS/Vue + core Rust) o nativo SwiftUI + binario Rust vía FFI/XPC.
+- Registering the app as the system proxy: call `networksetup` from Rust, or leave manual configuration in Network Settings.
+- To run in the background as a service: package it as a **LaunchAgent**.
+- For a configuration UI: **Tauri** (TS/Vue frontend + Rust core) or native SwiftUI + Rust binary via FFI/XPC.
 
-## Modo sin permisos de administrador (lanzador de shell)
+## Mode without administrator privileges (shell launcher)
 
-Para equipos donde no hay permisos de admin (no se puede instalar como `launchd`/`systemd`), se soporta un modo alternativo: lanzador integrado en `.zshrc`/`.bashrc` que comprueba si el daemon está corriendo y, si no, lo arranca en background. En equipos donde sí hay permisos, se puede instalar como servicio real (ver tabla de la sección anterior); el binario del daemon es agnóstico a cómo se lanza.
+For machines without admin privileges (where installing as `launchd`/`systemd` is not possible), an alternative mode is supported: a launcher embedded in `.zshrc`/`.bashrc` that checks whether the daemon is running and, if not, starts it in the background. On machines with privileges, it can be installed as a real service (see the table in the previous section); the daemon binary is agnostic to how it is launched.
 
-### Lanzador en `.zshrc` / `.bashrc`
+### Launcher in `.zshrc` / `.bashrc`
 
-- Comprobación basada en **pidfile** (`~/.local/state/zproxy/zproxy.pid`) + `flock` sobre un lockfile, para evitar condiciones de carrera si se abren varias terminales a la vez.
-- Al iniciar shell:
-  1. ¿Existe el pidfile?
-  2. ¿El PID está vivo (`kill -0`) y corresponde realmente a `zproxy` (evitar PIDs reciclados)?
-  3. Si no, limpiar pidfile y relanzar.
-- Arranque con `nohup zproxy daemon >> ~/.local/state/zproxy/log 2>&1 & disown` para que sobreviva al cierre de la terminal.
-- El check debe ser barato (leer pidfile + `kill -0`), sin spawnear procesos pesados en cada shell nuevo.
+- Check based on a **pidfile** (`~/.local/state/zproxy/zproxy.pid`) + `flock` on a lockfile, to avoid race conditions when several terminals open at the same time.
+- On shell startup:
+  1. Does the pidfile exist?
+  2. Is the PID alive (`kill -0`) and does it actually correspond to `zproxy` (avoid recycled PIDs)?
+  3. If not, clean up the pidfile and relaunch.
+- Start with `nohup zproxy daemon >> ~/.local/state/zproxy/log 2>&1 & disown` so it survives closing the terminal.
+- The check must be cheap (read pidfile + `kill -0`), without spawning heavy processes in every new shell.
 
-### `zproxy config` — wizard interactivo + recarga en caliente
+### `zproxy config` — interactive wizard + hot reload
 
-- Comando `zproxy config` lanza un wizard en terminal (crates candidatos: `dialoguer` o `inquire`) para configurar listen/upstream/fallback.
-- Canal de control vía **socket Unix** (`~/.local/state/zproxy/zproxy.sock`) en vez de señales (`SIGHUP`), por ser más flexible y portable entre macOS/Linux:
-  - Al guardar la config, el wizard escribe el TOML y envía un comando `reload` por el socket.
-  - El mismo socket sirve para `zproxy status`, `zproxy stop`, etc.
-  - Si el daemon no está corriendo, el wizard guarda el TOML sin notificar; el lanzador de shell lo recogerá en el próximo arranque.
+- The `zproxy config` command launches a terminal wizard (candidate crates: `dialoguer` or `inquire`) to configure listen/upstream/fallback.
+- Control channel via a **Unix socket** (`~/.local/state/zproxy/zproxy.sock`) instead of signals (`SIGHUP`), being more flexible and portable across macOS/Linux:
+  - When saving the config, the wizard writes the TOML and sends a `reload` command over the socket.
+  - The same socket serves `zproxy status`, `zproxy stop`, etc.
+  - If the daemon is not running, the wizard saves the TOML without notifying; the shell launcher will pick it up on the next start.
 
-### Distribución como servicio real (equipos con permisos)
+### Distribution as a real service (machines with privileges)
 
-- El binario del daemon corre en foreground; es `launchd`/`systemd` quien gestiona backgrounding, reinicio, logs, etc.
-- Se pueden distribuir plantillas opcionales de unit files (`.service` para systemd, `.plist` para launchd) sin que el binario dependa de ellas.
+- The daemon binary runs in the foreground; `launchd`/`systemd` handles backgrounding, restarts, logs, etc.
+- Optional unit file templates can be distributed (`.service` for systemd, `.plist` for launchd) without the binary depending on them.
 
-## Multiplataforma: macOS + Linux
+## Cross-platform: macOS + Linux
 
-El core del proxy (`tokio`, `hyper`, `tokio-socks`, `rustls`, `serde`/`toml`, `clap`) es portable sin cambios. Solo las partes de sistema necesitan implementación por plataforma, idealmente detrás de un trait (p. ej. `GatewayDetector`) con `#[cfg(target_os = "...")]`:
+The proxy core (`tokio`, `hyper`, `tokio-socks`, `rustls`, `serde`/`toml`, `clap`) is portable without changes. Only the system-specific parts need per-platform implementations, ideally behind a trait (e.g. `GatewayDetector`) with `#[cfg(target_os = "...")]`:
 
-| Función | macOS | Linux |
+| Function | macOS | Linux |
 |---|---|---|
-| Detección de gateway | `route -n get default` o `system-configuration` (SCDynamicStore) | leer `/proc/net/route`, o `ip route show default` |
-| Registrar como proxy del sistema | `networksetup` | según entorno (GNOME: `gsettings`; KDE: `kwriteconfig`; o variables `http_proxy`/`https_proxy`) |
-| Ejecutar como servicio | LaunchAgent/LaunchDaemon (`launchd`) | `systemd` unit |
+| Gateway detection | `route -n get default` or `system-configuration` (SCDynamicStore) | read `/proc/net/route`, or `ip route show default` |
+| Register as system proxy | `networksetup` | depends on the environment (GNOME: `gsettings`; KDE: `kwriteconfig`; or `http_proxy`/`https_proxy` variables) |
+| Run as a service | LaunchAgent/LaunchDaemon (`launchd`) | `systemd` unit |
 
-**Compilación cruzada:**
+**Cross-compilation:**
 
-- Compilar para Linux desde macOS: añadir target (`rustup target add x86_64-unknown-linux-gnu` / `aarch64-unknown-linux-gnu`) y usar `cross` (usa Docker por debajo) para evitar problemas de linking.
-- Alternativa más simple: compilar nativo en cada plataforma vía CI, con matrix de `macos-latest` / `ubuntu-latest` en GitHub Actions.
+- Build for Linux from macOS: add the target (`rustup target add x86_64-unknown-linux-gnu` / `aarch64-unknown-linux-gnu`) and use `cross` (Docker-based) to avoid linking issues.
+- Simpler alternative: build natively on each platform via CI, with a `macos-latest` / `ubuntu-latest` matrix in GitHub Actions.
 
-## Próximos pasos / decisiones pendientes
+## Next steps / open decisions
 
-- [ ] Definir estructura de crates del proyecto (workspace vs single crate).
-- [ ] Elegir si el fallback puede ser en cascada (otro proxy con su propio fallback) o solo un nivel.
-- [ ] Decidir si se necesitan reglas de bypass por dominio/IP (no pasar por proxy para ciertos destinos).
-- [ ] Elegir estrategia de detección de gateway: polling simple vs `SCDynamicStore`.
-- [ ] Decidir si habrá UI (Tauri) o solo CLI/daemon con LaunchAgent.
-- [ ] Prototipo mínimo: servidor HTTP proxy con `hyper` + soporte `CONNECT`, sin upstream todavía.
-- [ ] Diseñar trait `GatewayDetector` (u otro) para separar implementación por plataforma (macOS/Linux) desde el principio.
-- [ ] Implementar lanzador de shell (pidfile + lock) y comando `zproxy daemon`.
-- [ ] Implementar socket Unix de control (reload/status/stop) y wizard `zproxy config`.
+- [ ] Define the project crate structure (workspace vs single crate).
+- [ ] Decide whether the fallback can be cascaded (another proxy with its own fallback) or only one level.
+- [ ] Decide whether bypass rules by domain/IP are needed (skip the proxy for certain destinations).
+- [ ] Choose the gateway detection strategy: simple polling vs `SCDynamicStore`.
+- [ ] Decide whether there will be a UI (Tauri) or only a CLI/daemon with LaunchAgent.
+- [ ] Minimal prototype: HTTP proxy server with `hyper` + `CONNECT` support, no upstream yet.
+- [ ] Design the `GatewayDetector` trait (or similar) to separate per-platform implementations (macOS/Linux) from the start.
+- [ ] Implement the shell launcher (pidfile + lock) and the `zproxy daemon` command.
+- [ ] Implement the Unix control socket (reload/status/stop) and the `zproxy config` wizard.

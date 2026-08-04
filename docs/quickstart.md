@@ -41,54 +41,52 @@ pid:    /Users/you/.local/state/zproxy/zproxy.pid
 zproxy config
 ```
 
-The interactive wizard asks for:
-
-1. **Listen address** — host and port for the local proxy (default `127.0.0.1:8888`).
-2. **Upstream type** — `none`, `gateway` or `static`.
-3. **Upstream protocol** — `http` or `socks5` (only for `gateway` and `static`).
-4. **Fallback type** — `none`, `direct` or `static`.
+The interactive wizard walks you through listen address, upstream and fallback. Every prompt is pre-filled with the current value, so pressing <kbd>Enter</kbd> keeps it.
 
 If the daemon is already running, the wizard automatically sends a `reload` command through the control socket so the new config takes effect immediately.
 
-### Wizard walkthrough examples
+### Wizard session examples
 
 **Direct mode** (no upstream, direct fallback):
 
-```
-? Listen host › 127.0.0.1
-? Listen port › 8888
-? Upstream type › none
-? Fallback type › direct
-Config saved. Daemon reloaded.
-```
-
-**Gateway upstream** (route through current default gateway):
-
-```
-? Listen host › 127.0.0.1
-? Listen port › 8888
-? Upstream type › gateway
-? Upstream protocol › http
-? Upstream port › 8080
-? Poll interval (secs) › 5
-? Connect timeout (ms) › 3000
-? Fallback type › direct
-Config saved. Daemon reloaded.
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · none
+✔ Fallback type · direct
+reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 ```
 
-**Static SOCKS5 upstream** (fixed upstream proxy):
+**Gateway upstream** (route through the current default gateway):
 
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · gateway
+✔ Proxy protocol · http
+✔ Gateway upstream port · 8080
+✔ Gateway poll interval (seconds) · 5
+✔ Fallback type · direct
+reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
 ```
-? Listen host › 127.0.0.1
-? Listen port › 8888
-? Upstream type › static
-? Upstream protocol › socks5
-? Upstream host › 127.0.0.1
-? Upstream port › 1080
-? Connect timeout (ms) › 3000
-? Fallback type › none
-Config saved. Daemon reloaded.
+
+**Static SOCKS5 upstream** (fixed upstream proxy, no fallback):
+
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · static
+✔ Proxy protocol · socks5
+✔ Static upstream host · 127.0.0.1
+✔ Static upstream port · 1080
+✔ Fallback type · none
+reloaded: listen=127.0.0.1:8888 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
 ```
+
+See [configuration.md](configuration.md) for the full prompt reference and more session examples.
 
 ## Start the daemon
 

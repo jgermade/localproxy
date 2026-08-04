@@ -112,7 +112,7 @@ async fn run_config(paths: config::AppPaths) -> Result<()> {
 
     match control::send_command(paths.control_socket(), control::ControlCommand::Reload).await {
         Ok(response) => println!("{response}"),
-        Err(error) => println!("config guardada; daemon no notificado: {error}"),
+        Err(error) => println!("config saved; daemon not notified: {error}"),
     }
 
     Ok(())
@@ -127,26 +127,26 @@ async fn run_control(socket_path: PathBuf, command: control::ControlCommand) -> 
 fn run_start(paths: config::AppPaths, detached: bool) -> Result<()> {
     if detached {
         let pid = app::start_detached(&paths)?;
-        println!("daemon iniciado en background con pid {pid}");
+        println!("daemon started in background with pid {pid}");
         return Ok(());
     }
 
     if service::is_installed(&paths)? {
         service::start(&paths)?;
-        println!("servicio iniciado");
+        println!("service started");
         return Ok(());
     }
 
     let confirm = Confirm::new()
-        .with_prompt("No hay servicio instalado. ¿Quieres ejecutar start --detached?")
+        .with_prompt("No service installed. Do you want to run start --detached?")
         .default(true)
         .interact()?;
 
     if confirm {
         let pid = app::start_detached(&paths)?;
-        println!("daemon iniciado en background con pid {pid}");
+        println!("daemon started in background with pid {pid}");
     } else {
-        println!("cancelado");
+        println!("cancelled");
     }
 
     Ok(())
@@ -157,7 +157,7 @@ fn run_logs(paths: config::AppPaths, lines: usize, follow: bool, detached: bool)
         return service::logs(&paths, lines, follow);
     }
 
-    service::tail_file(&paths.log_file(), lines, follow)
+    service::tail_file(paths.log_file().as_path(), lines, follow)
 }
 
 fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
@@ -165,12 +165,12 @@ fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
         ServiceCommand::Install => service::install(&paths),
         ServiceCommand::Start => {
             service::start(&paths)?;
-            println!("servicio iniciado");
+            println!("service started");
             Ok(())
         }
         ServiceCommand::Restart => {
             service::restart(&paths)?;
-            println!("servicio reiniciado");
+            println!("service restarted");
             Ok(())
         }
         ServiceCommand::Status => {
@@ -180,7 +180,7 @@ fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
         }
         ServiceCommand::Stop => {
             service::stop(&paths)?;
-            println!("servicio detenido");
+            println!("service stopped");
             Ok(())
         }
         ServiceCommand::Logs { lines, follow } => service::logs(&paths, lines, follow),

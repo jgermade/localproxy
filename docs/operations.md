@@ -52,9 +52,21 @@ zproxy service uninstall
 ## `zproxy start` behaviour
 
 1. If a service is installed → runs `service start`.
-2. Otherwise → prompts: *"No service installed. Run start --detached?"*
-   - Confirmed → spawns detached daemon, prints PID.
-   - Declined → exits without starting anything.
+2. Otherwise → prompts before doing anything:
+
+```console
+$ zproxy start
+No service installed. Do you want to run start --detached? [Y/n] y
+daemon started in background with pid 41822
+```
+
+Declining leaves the system untouched:
+
+```console
+$ zproxy start
+No service installed. Do you want to run start --detached? [Y/n] n
+cancelled
+```
 
 Use `zproxy start --detached` to bypass the prompt and always start detached.
 
@@ -99,9 +111,19 @@ Fields: `listen`, `upstream`, `fallback`, `gateway` (current detected IP, or `un
 
 `zproxy config` opens the wizard, saves the file, and immediately sends `reload` to the daemon if it is running:
 
-```bash
-zproxy config
-# → wizard runs → config saved → daemon reloaded (or "daemon not notified: ..." if not running)
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · none
+✔ Fallback type · direct
+reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
+```
+
+If the daemon is not running, the config is still written and the last line becomes:
+
+```text
+config saved; daemon not notified: No such file or directory (os error 2)
 ```
 
 To reload without the wizard:
@@ -112,52 +134,61 @@ zproxy reload
 
 Reload replaces the in-memory config; in-flight connections continue with the old config, new connections use the new one.
 
-### `zproxy config` usage examples
+See [configuration.md](configuration.md) for the complete `zproxy config` prompt reference and session examples.
+
+### Common `zproxy config` operations
 
 **Switch from direct to gateway upstream while the daemon is running:**
 
-```bash
-zproxy config
-# Upstream type: gateway
-# Protocol: http
-# Port: 8080
-# Poll interval: 5
-# Timeout: 3000
-# Fallback: direct
-# → Config saved. Daemon reloaded.
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · gateway
+✔ Proxy protocol · http
+✔ Gateway upstream port · 8080
+✔ Gateway poll interval (seconds) · 5
+✔ Fallback type · direct
+reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
 ```
 
 **Disable the upstream temporarily (go direct):**
 
-```bash
-zproxy config
-# Upstream type: none
-# Fallback: direct
-# → Config saved. Daemon reloaded.
-```
-
-**Change the listen port (requires daemon restart to take effect):**
-
-```bash
-zproxy config
-# Listen host: 127.0.0.1
-# Listen port: 9999
-# → Config saved. Daemon reloaded.
-# Note: the port change takes effect after the daemon restarts.
-zproxy service restart   # or: zproxy stop && zproxy start
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · none
+✔ Fallback type · direct
+reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 ```
 
 **Point to a static SOCKS5 proxy:**
 
-```bash
-zproxy config
-# Upstream type: static
-# Protocol: socks5
-# Host: 127.0.0.1
-# Port: 1080
-# Timeout: 3000
-# Fallback: none
-# → Config saved. Daemon reloaded.
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 8888
+✔ Upstream type · static
+✔ Proxy protocol · socks5
+✔ Static upstream host · 127.0.0.1
+✔ Static upstream port · 1080
+✔ Fallback type · none
+reloaded: listen=127.0.0.1:8888 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
+```
+
+**Change the listen port** — the config is reloaded but the listener stays on the old port until the daemon restarts:
+
+```console
+$ zproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 9999
+✔ Upstream type · none
+✔ Fallback type · direct
+reloaded: listen=127.0.0.1:9999 upstream=none fallback=direct gateway=unknown
+
+$ zproxy service restart      # or: zproxy stop && zproxy start
+service restarted
 ```
 
 ## Gateway detection
