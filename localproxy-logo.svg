@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" font-family="ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace">
+  <defs>
+    <style>
+      .ink   { fill: #E7E5E0; }
+      .live  { fill: #33D17A; }
+      .live-stroke { stroke: #33D17A; }
+      .fallback-stroke { stroke: #5B6472; }
+      .muted { fill: #6B7280; }
+      .muted-fill { fill: #6B7280; }
+    </style>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="960" height="300" rx="20" fill="#14171A"/>
+
+  <!-- ==== ICON: two routes converging into the local node ==== -->
+  <g transform="translate(40,10)">
+    <!-- fallback route: dashed, muted, drawn first so live route sits on top -->
+    <path d="M 250 70 C 220 70 190 120 170 170" fill="none" class="fallback-stroke" stroke-width="5" stroke-dasharray="2 10" stroke-linecap="round"/>
+    <circle cx="250" cy="70" r="8" fill="none" class="fallback-stroke" stroke-width="3"/>
+
+    <!-- live route: solid, active accent -->
+    <path d="M 90 70 C 120 70 150 120 170 170" fill="none" class="live-stroke" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="90" cy="70" r="8" class="live"/>
+
+    <!-- local node: diamond top, squared bottom -->
+    <g transform="translate(170,170)">
+      <path d="M 0 -24 L 24 0 L 24 24 L -24 24 L -24 0 Z" class="ink"/>
+      <rect x="-8" y="-4" width="16" height="16" rx="2" class="live"/>
+    </g>
+  </g>
+
+  <!-- ==== WORDMARK ==== -->
+  <g transform="translate(340,0)">
+    <text x="0" y="168" font-size="66" font-weight="500" letter-spacing="0">
+      <tspan class="ink">local</tspan><tspan class="live" font-weight="700" dx="6">proxy</tspan>
+    </text>
+
+    <text x="2" y="205" font-size="15" letter-spacing="3" class="muted">GATEWAY-AWARE · FALLBACK · RUST</text>
+  </g>
+</svg>
