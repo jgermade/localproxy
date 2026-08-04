@@ -77,10 +77,10 @@ async fn detect_macos_gateway() -> Result<IpAddr> {
 
 #[cfg(target_os = "linux")]
 async fn detect_linux_gateway() -> Result<IpAddr> {
-    if let Ok(proc_contents) = tokio::fs::read_to_string("/proc/net/route").await {
-        if let Some(ip) = parse_linux_proc_route(&proc_contents)? {
-            return Ok(ip);
-        }
+    if let Ok(proc_contents) = tokio::fs::read_to_string("/proc/net/route").await
+        && let Some(ip) = parse_linux_proc_route(&proc_contents)?
+    {
+        return Ok(ip);
     }
 
     let output = Command::new("ip")
@@ -101,6 +101,7 @@ async fn detect_linux_gateway() -> Result<IpAddr> {
     parse_linux_ip_route(&String::from_utf8_lossy(&output.stdout))
 }
 
+#[cfg(target_os = "macos")]
 fn parse_gateway_output(output: &str) -> Result<IpAddr> {
     output
         .lines()

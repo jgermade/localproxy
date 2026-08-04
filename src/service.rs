@@ -508,6 +508,7 @@ fn xml_escape(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+#[cfg(target_os = "macos")]
 fn service_label() -> &'static str {
     "dev.zproxy"
 }

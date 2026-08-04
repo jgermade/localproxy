@@ -59,7 +59,7 @@ pub struct AppConfig {
     pub upstream: UpstreamConfig,
     #[serde(default)]
     pub fallback: FallbackConfig,
-    #[serde(default, rename = "proxy")]
+    #[serde(default, rename = "proxy", skip_serializing_if = "Vec::is_empty")]
     pub proxies: Vec<SavedProxy>,
 }
 
@@ -125,9 +125,10 @@ impl ListenConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UpstreamConfig {
+    #[default]
     None,
     Gateway {
         #[serde(default)]
@@ -151,16 +152,11 @@ pub enum UpstreamConfig {
     },
 }
 
-impl Default for UpstreamConfig {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FallbackConfig {
     None,
+    #[default]
     Direct,
     Saved {
         name: String,
@@ -173,12 +169,6 @@ pub enum FallbackConfig {
         #[serde(default = "default_connect_timeout_ms")]
         connect_timeout_ms: u64,
     },
-}
-
-impl Default for FallbackConfig {
-    fn default() -> Self {
-        Self::Direct
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
@@ -511,7 +501,10 @@ impl FallbackKind {
     }
 }
 
-fn prompt_proxy_list(theme: &ColorfulTheme, mut proxies: Vec<SavedProxy>) -> Result<Vec<SavedProxy>> {
+fn prompt_proxy_list(
+    theme: &ColorfulTheme,
+    mut proxies: Vec<SavedProxy>,
+) -> Result<Vec<SavedProxy>> {
     loop {
         let mut items: Vec<String> = proxies.iter().map(describe_saved_proxy).collect();
         let add_index = items.len();
