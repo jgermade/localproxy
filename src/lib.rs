@@ -9,6 +9,7 @@ pub mod cli;
 pub mod config;
 pub mod control;
 pub mod gateway;
+pub mod notify;
 pub mod proxy;
 pub mod service;
 pub mod stream;

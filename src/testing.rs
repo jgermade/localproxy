@@ -21,7 +21,11 @@ pub fn paths(dir: &Path) -> config::AppPaths {
 }
 
 /// Builds a shared state with no detected gateway and a fresh shutdown token.
-pub fn state(paths: config::AppPaths, config: config::AppConfig) -> SharedState {
+///
+/// Desktop notifications are disabled so the suite never posts to the user session.
+pub fn state(paths: config::AppPaths, mut config: config::AppConfig) -> SharedState {
+    config.notifications.enabled = false;
+
     SharedState {
         paths,
         config: Arc::new(RwLock::new(config)),

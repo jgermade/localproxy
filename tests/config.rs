@@ -7,9 +7,9 @@ use std::{
 };
 
 use localproxy::config::{
-    AppConfig, AppPaths, FallbackConfig, ListenConfig, ProxyProtocol, SavedProxy, UpstreamConfig,
-    fallback_allows_direct, gateway_poll_interval_secs, load_or_create, resolve_fallback_endpoint,
-    resolve_upstream_endpoint, save, summarize,
+    AppConfig, AppPaths, FallbackConfig, ListenConfig, NotificationsConfig, ProxyProtocol,
+    SavedProxy, UpstreamConfig, fallback_allows_direct, gateway_poll_interval_secs, load_or_create,
+    resolve_fallback_endpoint, resolve_upstream_endpoint, save, summarize,
 };
 
 fn paths_in(dir: &Path) -> AppPaths {
@@ -62,6 +62,7 @@ fn default_config_listens_on_localhost_and_goes_direct() {
     );
     assert!(matches!(config.upstream, UpstreamConfig::None));
     assert!(matches!(config.fallback, FallbackConfig::Direct));
+    assert!(config.notifications.enabled);
     assert!(config.proxies.is_empty());
 }
 
@@ -106,6 +107,7 @@ fn toml_roundtrip_preserves_every_section() {
             port: 8080,
             connect_timeout_ms: 400,
         },
+        notifications: NotificationsConfig { enabled: false },
         proxies: vec![static_proxy("corp", ProxyProtocol::Socks5)],
     };
 
@@ -134,6 +136,7 @@ fn toml_roundtrip_preserves_every_section() {
     assert_eq!(parsed.proxies.len(), 1);
     assert_eq!(parsed.proxies[0].name, "corp");
     assert_eq!(parsed.proxies[0].connect_timeout_ms, 1_500);
+    assert!(!parsed.notifications.enabled);
 }
 
 #[test]
@@ -169,6 +172,19 @@ fn optional_fields_use_defaults_when_missing() {
     ));
     assert!(matches!(config.proxies[0].protocol, ProxyProtocol::Http));
     assert_eq!(config.proxies[0].connect_timeout_ms, 3_000);
+    assert!(config.notifications.enabled);
+}
+
+#[test]
+fn notifications_can_be_disabled_from_the_config_file() {
+    let raw = r#"
+        [notifications]
+        enabled = false
+    "#;
+
+    let config: AppConfig = toml::from_str(raw).unwrap();
+
+    assert!(!config.notifications.enabled);
 }
 
 #[test]

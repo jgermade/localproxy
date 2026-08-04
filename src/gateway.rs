@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use tokio::{process::Command, time};
 use tracing::{debug, warn};
 
-use crate::{app::SharedState, config};
+use crate::{app::SharedState, config, notify};
 
 pub async fn run(state: SharedState) -> Result<()> {
     loop {
@@ -21,6 +21,11 @@ pub async fn run(state: SharedState) -> Result<()> {
                     let mut current = state.gateway_ip.write().await;
                     if *current != Some(gateway) {
                         debug!(gateway = %gateway, "gateway actualizado");
+                        notify::notify(
+                            &cfg.notifications,
+                            "gateway actualizado",
+                            &format!("upstream a través de {gateway}"),
+                        );
                         *current = Some(gateway);
                     }
                 }

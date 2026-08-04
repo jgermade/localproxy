@@ -12,7 +12,7 @@ use tokio::{signal, sync::RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-use crate::{config, control, gateway, proxy};
+use crate::{config, control, gateway, notify, proxy};
 
 #[derive(Clone)]
 pub struct SharedState {
@@ -33,6 +33,15 @@ pub async fn run_daemon(paths: config::AppPaths) -> Result<()> {
         gateway_ip: Arc::new(RwLock::new(None)),
         shutdown: CancellationToken::new(),
     };
+
+    {
+        let cfg = state.config.read().await;
+        notify::notify(
+            &cfg.notifications,
+            "localproxy iniciado",
+            &format!("escuchando en {}", cfg.listen.socket_addr()),
+        );
+    }
 
     let gateway_state = state.clone();
     let gateway_task = tokio::spawn(async move {
@@ -61,6 +70,15 @@ pub async fn run_daemon(paths: config::AppPaths) -> Result<()> {
     gateway_task.await?;
     control_task.await?;
     signal_task.abort();
+
+    {
+        let cfg = state.config.read().await;
+        notify::notify(
+            &cfg.notifications,
+            "localproxy detenido",
+            "el daemon ha finalizado",
+        );
+    }
 
     drop(pid_guard);
     proxy_result

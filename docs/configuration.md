@@ -58,6 +58,7 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 | 14 | `Fallback proxy` | list of saved proxies | fallback is `saved` | current selection |
 | 15 | `Fallback host` | text | fallback is `static` | current or `127.0.0.1` |
 | 16 | `Fallback port` | text | fallback is `static` | current or `8080` |
+| 17 | `Desktop notifications` | confirm: `y` / `n` | always | current value (`y`) |
 
 > `connect_timeout_ms` is only asked for saved proxies. For `gateway` and `static` entries it is always written as `3000`. Edit the TOML file manually to change it.
 
@@ -295,6 +296,9 @@ type = "none"
 [fallback]
 type = "direct"
 
+[notifications]
+enabled = true
+
 [[proxy]]
 name = "corp"
 protocol = "http"
@@ -309,6 +313,21 @@ connect_timeout_ms = 3000
 |---|---|---|---|
 | `host` | IP string | `"127.0.0.1"` | Local bind address. |
 | `port` | integer | `1234` | Local bind port. |
+
+## [notifications]
+
+Desktop notifications for daemon events: startup, shutdown, config reload and gateway changes.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | boolean | `true` | Set to `false` to silence every notification. |
+
+```toml
+[notifications]
+enabled = false
+```
+
+> Notifications are best effort: if the desktop notification service is unavailable the failure is only logged at debug level and the proxy keeps running. No administrator privileges are required, but macOS asks the user to allow notifications the first time one is posted.
 
 ## [[proxy]]
 

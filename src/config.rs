@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use dialoguer::{Input, Select, theme::ColorfulTheme};
+use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -59,6 +59,8 @@ pub struct AppConfig {
     pub upstream: UpstreamConfig,
     #[serde(default)]
     pub fallback: FallbackConfig,
+    #[serde(default)]
+    pub notifications: NotificationsConfig,
     #[serde(default, rename = "proxy", skip_serializing_if = "Vec::is_empty")]
     pub proxies: Vec<SavedProxy>,
 }
@@ -69,6 +71,7 @@ impl Default for AppConfig {
             listen: ListenConfig::default(),
             upstream: UpstreamConfig::None,
             fallback: FallbackConfig::Direct,
+            notifications: NotificationsConfig::default(),
             proxies: Vec::new(),
         }
     }
@@ -122,6 +125,21 @@ impl Default for ListenConfig {
 impl ListenConfig {
     pub fn socket_addr(&self) -> SocketAddr {
         SocketAddr::new(self.host, self.port)
+    }
+}
+
+/// Desktop notifications for daemon lifecycle events.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationsConfig {
+    #[serde(default = "default_notifications_enabled")]
+    pub enabled: bool,
+}
+
+impl Default for NotificationsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_notifications_enabled(),
+        }
     }
 }
 
@@ -232,6 +250,10 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
     let proxies = prompt_proxy_list(&theme, current.proxies.clone())?;
     let upstream = prompt_upstream(&theme, &current.upstream, &proxies)?;
     let fallback = prompt_fallback(&theme, &current.fallback, &proxies)?;
+    let notifications_enabled = Confirm::with_theme(&theme)
+        .with_prompt("Desktop notifications")
+        .default(current.notifications.enabled)
+        .interact()?;
 
     Ok(AppConfig {
         listen: ListenConfig {
@@ -240,6 +262,9 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
         },
         upstream,
         fallback,
+        notifications: NotificationsConfig {
+            enabled: notifications_enabled,
+        },
         proxies,
     })
 }
@@ -750,6 +775,10 @@ fn default_poll_interval_secs() -> u64 {
 
 fn default_connect_timeout_ms() -> u64 {
     3_000
+}
+
+fn default_notifications_enabled() -> bool {
+    true
 }
 
 #[cfg(test)]

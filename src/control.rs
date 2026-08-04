@@ -7,7 +7,7 @@ use tokio::{
 };
 use tracing::{debug, info};
 
-use crate::{app::SharedState, config};
+use crate::{app::SharedState, config, notify};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ControlCommand {
@@ -100,7 +100,9 @@ async fn handle_client(stream: UnixStream, state: SharedState) -> Result<()> {
         ControlCommand::Reload => {
             let reloaded = config::load_or_create(&state.paths)?;
             let summary = config::summarize(&reloaded, *state.gateway_ip.read().await);
-            *state.config.write().await = reloaded;
+            let mut running = state.config.write().await;
+            notify::notify(&running.notifications, "localproxy recargado", &summary);
+            *running = reloaded;
             format!("reloaded: {summary}")
         }
         ControlCommand::Stop => {
