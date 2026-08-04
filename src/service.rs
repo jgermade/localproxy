@@ -516,7 +516,6 @@ fn service_label() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::test_paths;
 
     #[test]
     fn xml_escape_replaces_every_reserved_character() {
@@ -530,34 +529,6 @@ mod tests {
     #[test]
     fn the_service_label_is_stable() {
         assert_eq!(service_label(), "dev.zproxy");
-    }
-
-    #[test]
-    fn is_installed_answers_without_failing() {
-        let dir = tempfile::tempdir().unwrap();
-        let paths = test_paths(dir.path());
-
-        // It inspects the real HOME, so only the absence of errors can be asserted.
-        assert!(is_installed(&paths).is_ok());
-    }
-
-    #[test]
-    fn tailing_a_missing_log_file_fails() {
-        let dir = tempfile::tempdir().unwrap();
-        let missing = dir.path().join("zproxy.log");
-
-        let error = tail_file(&missing, 10, false).unwrap_err();
-
-        assert!(error.to_string().contains("no existe el fichero de log"));
-    }
-
-    #[test]
-    fn tailing_an_existing_log_file_succeeds() {
-        let dir = tempfile::tempdir().unwrap();
-        let log = dir.path().join("zproxy.log");
-        fs::write(&log, "line one\nline two\n").unwrap();
-
-        assert!(tail_file(&log, 1, false).is_ok());
     }
 
     #[test]

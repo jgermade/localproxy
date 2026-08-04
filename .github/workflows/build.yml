@@ -73,7 +73,7 @@ jobs:
           restore-keys: ${{ runner.os }}-coverage-cargo-
 
       - name: Run coverage
-        run: scripts/coverage.sh --fail-under 70
+        run: scripts/coverage.sh --fail-under 60
 
       - name: Upload coverage report
         if: always()

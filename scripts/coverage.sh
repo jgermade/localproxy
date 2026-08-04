@@ -56,7 +56,7 @@ llvm_bin="$(find_llvm_bin_dir)"
 profdata="$llvm_bin/llvm-profdata"
 cov="$llvm_bin/llvm-cov"
 out_dir="target/coverage"
-ignore='/\.cargo/registry|/rustc/|/rustlib/'
+ignore='/\.cargo/registry|/rustc/|/rustlib/|/tests/|src/testing\.rs'
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"

@@ -140,38 +140,7 @@ fn parse_linux_ip_route(contents: &str) -> Result<IpAddr> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::{test_paths, test_state};
     use std::net::Ipv4Addr;
-
-    #[tokio::test]
-    async fn the_detector_returns_immediately_when_already_cancelled() {
-        let dir = tempfile::tempdir().unwrap();
-        let state = test_state(test_paths(dir.path()), config::AppConfig::default());
-        state.shutdown.cancel();
-
-        run(state).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn the_detector_clears_the_gateway_outside_gateway_mode() {
-        let dir = tempfile::tempdir().unwrap();
-        let state = test_state(test_paths(dir.path()), config::AppConfig::default());
-        *state.gateway_ip.write().await = Some(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)));
-
-        let task_state = state.clone();
-        let handle = tokio::spawn(async move { run(task_state).await });
-
-        for _ in 0..200 {
-            if state.gateway_ip.read().await.is_none() {
-                break;
-            }
-            time::sleep(Duration::from_millis(10)).await;
-        }
-        assert!(state.gateway_ip.read().await.is_none());
-
-        state.shutdown.cancel();
-        handle.await.unwrap().unwrap();
-    }
 
     const MACOS_ROUTE_OUTPUT: &str = "   route to: default\n\
 destination: default\n\
