@@ -12,7 +12,14 @@ curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh
 wget -qO- https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
 ```
 
-Options go after `-s --`, e.g. `bash -s -- --dir /usr/local/bin --no-modify-profile`.
+Options go after `-s --` (`--version`, `--dir`, `--profile`, `--no-modify-profile`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh \
+  | bash -s -- --dir /usr/local/bin --no-modify-profile
+```
+
+Re-run the same command to upgrade.
 
 Manual alternative — grab the prebuilt binary attached to the latest release:
 
