@@ -10,6 +10,21 @@ cargo run -- daemon
 
 Hoy no incorpora su propio backgrounding. Si quieres dejarlo como proceso gestionado, necesitas envolverlo desde fuera con launchd, systemd, tmux, nohup o herramientas similares.
 
+Con los comandos nuevos:
+
+- `zproxy service install`: registra servicio de usuario (LaunchAgent en macOS, systemd --user en Linux).
+- `zproxy service start`: inicia el servicio registrado.
+- `zproxy service status`: muestra estado del servicio en launchctl/systemd.
+- `zproxy service stop`: detiene el servicio registrado.
+- `zproxy service uninstall`: elimina el servicio de usuario.
+- `zproxy start --detached`: arranca una instancia en background sin registrar servicio.
+- `zproxy start`: si detecta servicio instalado, ejecuta `service start`; si no, pregunta si quieres detached.
+
+Comportamiento de `zproxy start`:
+
+1. Si detecta servicio instalado, lo inicia.
+2. Si no lo detecta, pregunta si quieres lanzar modo detached.
+
 ## Estado en disco
 
 zproxy usa `~/.local/state/zproxy` para material de runtime:
@@ -132,4 +147,4 @@ ip route show default
 - No hay healthcheck persistente del upstream fuera del intento de conexión.
 - No hay autenticación hacia proxies HTTP o SOCKS5.
 - No hay endpoint de métricas.
-- No hay comandos de administración extra aparte de status, reload y stop.
+- No hay comandos de administración del socket aparte de status, reload y stop.

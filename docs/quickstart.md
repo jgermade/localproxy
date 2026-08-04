@@ -54,6 +54,19 @@ Si el daemon ya está corriendo, el wizard intenta pedir una recarga automática
 cargo run -- daemon
 ```
 
+Alternativa recomendada para uso diario:
+
+```bash
+cargo run -- service install
+cargo run -- start
+```
+
+Si no quieres instalar servicio:
+
+```bash
+cargo run -- start --detached
+```
+
 Qué hace este comando:
 
 - crea las carpetas de config y estado si no existen

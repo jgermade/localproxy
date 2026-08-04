@@ -3,12 +3,14 @@ mod config;
 mod control;
 mod gateway;
 mod proxy;
+mod service;
 mod stream;
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use dialoguer::Confirm;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -28,7 +30,24 @@ enum Command {
     Status,
     Stop,
     Reload,
+    Start {
+        #[arg(long)]
+        detached: bool,
+    },
+    Service {
+        #[command(subcommand)]
+        command: ServiceCommand,
+    },
     Paths,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+enum ServiceCommand {
+    Install,
+    Start,
+    Status,
+    Stop,
+    Uninstall,
 }
 
 #[tokio::main]
@@ -54,6 +73,8 @@ async fn main() -> Result<()> {
         Command::Reload => {
             run_control(paths.control_socket(), control::ControlCommand::Reload).await
         }
+        Command::Start { detached } => run_start(paths, detached),
+        Command::Service { command } => run_service(paths, command),
         Command::Paths => {
             println!("config: {}", paths.config_file.display());
             println!("state: {}", paths.state_dir.display());
@@ -81,4 +102,54 @@ async fn run_control(socket_path: PathBuf, command: control::ControlCommand) -> 
     let response = control::send_command(socket_path, command).await?;
     println!("{response}");
     Ok(())
+}
+
+fn run_start(paths: config::AppPaths, detached: bool) -> Result<()> {
+    if detached {
+        let pid = app::start_detached(&paths)?;
+        println!("daemon iniciado en background con pid {pid}");
+        return Ok(());
+    }
+
+    if service::is_installed(&paths)? {
+        service::start(&paths)?;
+        println!("servicio iniciado");
+        return Ok(());
+    }
+
+    let confirm = Confirm::new()
+        .with_prompt("No hay servicio instalado. ¿Quieres ejecutar start --detached?")
+        .default(true)
+        .interact()?;
+
+    if confirm {
+        let pid = app::start_detached(&paths)?;
+        println!("daemon iniciado en background con pid {pid}");
+    } else {
+        println!("cancelado");
+    }
+
+    Ok(())
+}
+
+fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
+    match command {
+        ServiceCommand::Install => service::install(&paths),
+        ServiceCommand::Start => {
+            service::start(&paths)?;
+            println!("servicio iniciado");
+            Ok(())
+        }
+        ServiceCommand::Status => {
+            let status = service::status(&paths)?;
+            println!("{status}");
+            Ok(())
+        }
+        ServiceCommand::Stop => {
+            service::stop(&paths)?;
+            println!("servicio detenido");
+            Ok(())
+        }
+        ServiceCommand::Uninstall => service::uninstall(&paths),
+    }
 }

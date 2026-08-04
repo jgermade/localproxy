@@ -2,6 +2,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::PathBuf,
+    process::{Command, Stdio},
     sync::Arc,
 };
 
@@ -103,4 +104,28 @@ impl Drop for PidGuard {
         let _ = self.lock_file.unlock();
         let _ = fs::remove_file(&self.pid_path);
     }
+}
+
+pub fn start_detached(paths: &config::AppPaths) -> Result<u32> {
+    paths.ensure_dirs()?;
+
+    let exe = std::env::current_exe().context("no se pudo resolver la ruta del ejecutable")?;
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(paths.log_file())?;
+    let err_file = log_file.try_clone()?;
+
+    let mut command = Command::new(exe);
+    command
+        .arg("daemon")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(log_file))
+        .stderr(Stdio::from(err_file));
+
+    let child = command
+        .spawn()
+        .context("no se pudo arrancar zproxy daemon en background")?;
+
+    Ok(child.id())
 }
