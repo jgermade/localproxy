@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/jgermade/localproxy/main/install.sh | bash
-```pul
+```
 
 Prefer doing it by hand? Download the binary for your platform
 from the [latest release](https://github.com/jgermade/localproxy/releases/latest):

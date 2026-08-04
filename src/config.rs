@@ -133,12 +133,16 @@ impl ListenConfig {
 pub struct NotificationsConfig {
     #[serde(default = "default_notifications_enabled")]
     pub enabled: bool,
+    /// Path to a custom notification image; defaults to the logo bundled in the binary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 impl Default for NotificationsConfig {
     fn default() -> Self {
         Self {
             enabled: default_notifications_enabled(),
+            icon: None,
         }
     }
 }
@@ -254,6 +258,11 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
         .with_prompt("Desktop notifications")
         .default(current.notifications.enabled)
         .interact()?;
+    let notifications_icon = if notifications_enabled {
+        prompt_notification_icon(&theme, current.notifications.icon.as_deref())?
+    } else {
+        current.notifications.icon.clone()
+    };
 
     Ok(AppConfig {
         listen: ListenConfig {
@@ -264,9 +273,24 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
         fallback,
         notifications: NotificationsConfig {
             enabled: notifications_enabled,
+            icon: notifications_icon,
         },
         proxies,
     })
+}
+
+fn prompt_notification_icon(
+    theme: &ColorfulTheme,
+    current: Option<&str>,
+) -> Result<Option<String>> {
+    let icon: String = Input::with_theme(theme)
+        .with_prompt("Notification icon path (empty = bundled logo)")
+        .default(current.unwrap_or_default().to_string())
+        .allow_empty(true)
+        .interact_text()?;
+
+    let icon = icon.trim().to_string();
+    Ok((!icon.is_empty()).then_some(icon))
 }
 
 pub fn resolve_upstream_endpoint(

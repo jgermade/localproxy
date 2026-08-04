@@ -107,7 +107,10 @@ fn toml_roundtrip_preserves_every_section() {
             port: 8080,
             connect_timeout_ms: 400,
         },
-        notifications: NotificationsConfig { enabled: false },
+        notifications: NotificationsConfig {
+            enabled: false,
+            icon: Some("/tmp/custom-icon.png".to_string()),
+        },
         proxies: vec![static_proxy("corp", ProxyProtocol::Socks5)],
     };
 
@@ -137,6 +140,10 @@ fn toml_roundtrip_preserves_every_section() {
     assert_eq!(parsed.proxies[0].name, "corp");
     assert_eq!(parsed.proxies[0].connect_timeout_ms, 1_500);
     assert!(!parsed.notifications.enabled);
+    assert_eq!(
+        parsed.notifications.icon.as_deref(),
+        Some("/tmp/custom-icon.png")
+    );
 }
 
 #[test]
@@ -185,6 +192,14 @@ fn notifications_can_be_disabled_from_the_config_file() {
     let config: AppConfig = toml::from_str(raw).unwrap();
 
     assert!(!config.notifications.enabled);
+    assert!(config.notifications.icon.is_none());
+}
+
+#[test]
+fn the_notification_icon_is_omitted_when_unset() {
+    let serialized = toml::to_string_pretty(&AppConfig::default()).unwrap();
+
+    assert!(!serialized.contains("icon"));
 }
 
 #[test]

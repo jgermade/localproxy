@@ -59,6 +59,7 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 | 15 | `Fallback host` | text | fallback is `static` | current or `127.0.0.1` |
 | 16 | `Fallback port` | text | fallback is `static` | current or `8080` |
 | 17 | `Desktop notifications` | confirm: `y` / `n` | always | current value (`y`) |
+| 18 | `Notification icon path (empty = bundled logo)` | text | notifications are enabled | current value (empty) |
 
 > `connect_timeout_ms` is only asked for saved proxies. For `gateway` and `static` entries it is always written as `3000`. Edit the TOML file manually to change it.
 
@@ -321,13 +322,19 @@ Desktop notifications for daemon events: startup, shutdown, config reload and ga
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | boolean | `true` | Set to `false` to silence every notification. |
+| `icon` | path string | bundled logo | Image shown with the notification. |
 
 ```toml
 [notifications]
-enabled = false
+enabled = true
+icon = "/Users/me/Pictures/my-icon.png"
 ```
 
+The icon is optional: when it is not set, localproxy uses the logo bundled in the binary (cropped from `localproxy-logo.svg`) and writes it to `~/.local/state/localproxy/localproxy-icon.png` so the notification service can read it from disk.
+
 > Notifications are best effort: if the desktop notification service is unavailable the failure is only logged at debug level and the proxy keeps running. No administrator privileges are required, but macOS asks the user to allow notifications the first time one is posted.
+>
+> On macOS the image is rendered inside the banner. The small app icon and the app name on its left belong to the process that posts the notification, and changing those requires shipping localproxy inside a signed `.app` bundle.
 
 ## [[proxy]]
 
