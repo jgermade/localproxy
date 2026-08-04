@@ -1,6 +1,6 @@
 [package]
 name = "localproxy"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 description = "Local proxy daemon that forwards HTTP and HTTPS traffic through a configurable upstream chain"
 license = "MIT"
