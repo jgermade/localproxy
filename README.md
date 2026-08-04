@@ -40,6 +40,48 @@ Available assets: `zproxy-macos-aarch64`, `zproxy-macos-x86_64`, `zproxy-linux-x
 `zproxy-linux-aarch64`. See [docs/installation.md](docs/installation.md) for platform detection,
 Gatekeeper notes, upgrades and uninstall.
 
+## Shell setup (zsh / bash)
+
+zproxy does not change the system network settings: tools pick it up through the `http_proxy` /
+`https_proxy` environment variables. Add this to `~/.zshrc` (zsh) or `~/.bashrc` / `~/.bash_profile`
+(bash) to start the daemon when it is not running and export the variables:
+
+```bash
+# --- zproxy ---------------------------------------------------------------
+export PATH="$HOME/.local/bin:$PATH"
+
+ZPROXY_URL="http://127.0.0.1:8888"
+ZPROXY_NO_PROXY="localhost,127.0.0.1,::1"
+
+if command -v zproxy > /dev/null 2>&1; then
+  # `zproxy status` talks to the control socket, so it only succeeds when the
+  # daemon is really listening. Start it in the background otherwise.
+  zproxy status > /dev/null 2>&1 || zproxy start --detached > /dev/null 2>&1
+
+  export http_proxy="$ZPROXY_URL"
+  export https_proxy="$ZPROXY_URL"
+  export all_proxy="$ZPROXY_URL"
+  export HTTP_PROXY="$ZPROXY_URL"
+  export HTTPS_PROXY="$ZPROXY_URL"
+  export ALL_PROXY="$ZPROXY_URL"
+  export no_proxy="$ZPROXY_NO_PROXY"
+  export NO_PROXY="$ZPROXY_NO_PROXY"
+fi
+# --------------------------------------------------------------------------
+```
+
+Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
+
+- Both cases are exported on purpose: `curl` and most Unix tools read the lowercase names, while
+  many language runtimes read the uppercase ones.
+- If you registered the service (`zproxy service install`), replace `zproxy start --detached` with
+  `zproxy service start`.
+- Extend `ZPROXY_NO_PROXY` with the hosts that must bypass the proxy, e.g.
+  `"localhost,127.0.0.1,::1,.internal.example.com,192.168.0.0/16"`.
+- The `zproxy status` probe adds a few milliseconds to every shell start; use the `proxy-on` /
+  `proxy-off` toggle functions from [docs/shell-integration.md](docs/shell-integration.md) if you
+  prefer to opt in per session.
+
 ## Documentation
 
 - [docs/installation.md](docs/installation.md) — install from the release binaries, upgrade and uninstall.
@@ -108,7 +150,7 @@ CARGO_HOME=$PWD/.cargo-home cargo check
 | [build.yml](.github/workflows/build.yml) | push / PR to `main` |
 | [release.yml](.github/workflows/release.yml) | manual dispatch with `patch` / `minor` / `major` input |
 
-`build.yml` runs fmt, clippy, `cargo test` and a coverage gate (`scripts/coverage.sh --fail-under 70`)
+`build.yml` runs fmt, clippy, `cargo test` and a coverage gate (`scripts/coverage.sh --fail-under 60`)
 before building the binaries.
 
 `release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries attached.

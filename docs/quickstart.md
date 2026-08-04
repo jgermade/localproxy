@@ -150,8 +150,66 @@ export https_proxy="$http_proxy"
 export no_proxy="localhost,127.0.0.1,::1"
 ```
 
-See [shell-integration.md](shell-integration.md) for persistent zsh/bash setup, toggle functions and
-tools that need their own proxy configuration.
+### Make it permanent (zsh / bash)
+
+Add this block to `~/.zshrc` (zsh), `~/.bashrc` (bash on Linux) or `~/.bash_profile` (bash login
+shell on macOS). It starts the daemon if it is not already running and exports every variable the
+usual tooling looks at:
+
+```bash
+# --- zproxy ---------------------------------------------------------------
+export PATH="$HOME/.local/bin:$PATH"
+
+ZPROXY_URL="http://127.0.0.1:8888"
+ZPROXY_NO_PROXY="localhost,127.0.0.1,::1"
+
+if command -v zproxy > /dev/null 2>&1; then
+  # `zproxy status` talks to the control socket, so it only succeeds when the
+  # daemon is really listening. Start it in the background otherwise.
+  zproxy status > /dev/null 2>&1 || zproxy start --detached > /dev/null 2>&1
+
+  export http_proxy="$ZPROXY_URL"
+  export https_proxy="$ZPROXY_URL"
+  export all_proxy="$ZPROXY_URL"
+  export HTTP_PROXY="$ZPROXY_URL"
+  export HTTPS_PROXY="$ZPROXY_URL"
+  export ALL_PROXY="$ZPROXY_URL"
+  export no_proxy="$ZPROXY_NO_PROXY"
+  export NO_PROXY="$ZPROXY_NO_PROXY"
+fi
+# --------------------------------------------------------------------------
+```
+
+Apply it to the current shell:
+
+```bash
+source ~/.zshrc     # or ~/.bashrc
+```
+
+Check the result:
+
+```bash
+env | grep -i proxy
+zproxy status
+curl -s https://example.com > /dev/null && echo ok
+```
+
+Notes:
+
+- Lowercase and uppercase variables are both exported because tools disagree: `curl` and most Unix
+  tools read the lowercase names, many language runtimes read the uppercase ones.
+- If you registered the service with `zproxy service install`, replace `zproxy start --detached`
+  with `zproxy service start` so the service manager owns the process.
+- `zproxy start` without `--detached` asks for confirmation when no service is installed, so it is
+  not safe inside a startup file. Always use `start --detached` or `service start` there.
+- Extend `ZPROXY_NO_PROXY` with the hosts that must bypass the proxy, e.g.
+  `"localhost,127.0.0.1,::1,.internal.example.com,192.168.0.0/16"`.
+- The `zproxy status` probe adds a few milliseconds to every shell start. If that matters, drop the
+  auto-start line and use the `proxy-on` / `proxy-off` functions from
+  [shell-integration.md](shell-integration.md).
+
+See [shell-integration.md](shell-integration.md) for toggle functions, per-command wrappers, aliases
+and tools that need their own proxy configuration.
 
 ## Query status
 
