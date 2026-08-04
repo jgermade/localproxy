@@ -7,11 +7,11 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     app::SharedState,
-    config::{self, AppConfig, FallbackConfig, ProxyEndpoint, ProxyProtocol},
+    config::{self, AppConfig, ProxyEndpoint, ProxyProtocol},
     stream::ProxyStream,
 };
 
@@ -183,9 +183,10 @@ async fn connect_http_proxy_tunnel(endpoint: &ProxyEndpoint, target: &str) -> Re
 }
 
 async fn connect_socks5_proxy(endpoint: &ProxyEndpoint, target: &str) -> Result<ProxyStream> {
+    let proxy_address = endpoint.address();
     let stream = time::timeout(
         timeout_for(endpoint),
-        tokio_socks::tcp::Socks5Stream::connect(endpoint.address(), target.to_string()),
+        tokio_socks::tcp::Socks5Stream::connect(proxy_address.as_str(), target),
     )
     .await
     .context("timeout conectando a upstream socks5")??;
