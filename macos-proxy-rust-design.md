@@ -50,7 +50,7 @@ Components:
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "gateway"          # "gateway" | "static" | "none"

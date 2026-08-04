@@ -247,7 +247,7 @@ write_block() {
     printf '\n%s\n' "$BLOCK_BEGIN"
     printf 'export PATH="%s:$PATH"\n\n' "$(portable_dir)"
     cat << 'LOCALPROXY_BLOCK'
-LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then

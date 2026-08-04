@@ -55,10 +55,10 @@ fn default_config_listens_on_localhost_and_goes_direct() {
     let config = AppConfig::default();
 
     assert_eq!(config.listen.host, IpAddr::V4(Ipv4Addr::LOCALHOST));
-    assert_eq!(config.listen.port, 8888);
+    assert_eq!(config.listen.port, 1234);
     assert_eq!(
         config.listen.socket_addr(),
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8888)
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 1234)
     );
     assert!(matches!(config.upstream, UpstreamConfig::None));
     assert!(matches!(config.fallback, FallbackConfig::Direct));
@@ -82,7 +82,7 @@ fn listen_config_supports_ipv6() {
 fn empty_toml_falls_back_to_defaults() {
     let config: AppConfig = toml::from_str("").unwrap();
 
-    assert_eq!(config.listen.port, 8888);
+    assert_eq!(config.listen.port, 1234);
     assert!(matches!(config.upstream, UpstreamConfig::None));
     assert!(matches!(config.fallback, FallbackConfig::Direct));
 }
@@ -202,7 +202,7 @@ fn load_or_create_writes_the_default_config_when_missing() {
     let config = load_or_create(&paths).unwrap();
 
     assert!(paths.config_file.is_file());
-    assert_eq!(config.listen.port, 8888);
+    assert_eq!(config.listen.port, 1234);
 }
 
 #[test]
@@ -403,7 +403,7 @@ fn summarize_renders_every_field() {
 
     assert_eq!(
         summarize(&config, Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)))),
-        "listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1"
+        "listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1"
     );
     assert!(summarize(&config, None).ends_with("gateway=unknown"));
 }

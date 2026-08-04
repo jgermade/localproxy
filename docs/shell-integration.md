@@ -4,7 +4,7 @@ localproxy does not touch the system network settings. Applications use it only 
 usually through the `http_proxy` / `https_proxy` environment variables. This page shows how to wire
 that into zsh and bash.
 
-Everything below assumes the default listen address `127.0.0.1:8888`. Check yours with:
+Everything below assumes the default listen address `127.0.0.1:1234`. Check yours with:
 
 ```bash
 localproxy status
@@ -30,7 +30,7 @@ Simplest setup: export the variables unconditionally. Only do this if the daemon
 otherwise every tool will fail when localproxy is down.
 
 ```bash
-export LOCALPROXY_URL="http://127.0.0.1:8888"
+export LOCALPROXY_URL="http://127.0.0.1:1234"
 export http_proxy="$LOCALPROXY_URL"
 export https_proxy="$LOCALPROXY_URL"
 export HTTP_PROXY="$LOCALPROXY_URL"
@@ -53,7 +53,7 @@ export no_proxy="localhost,127.0.0.1,::1,.internal.example.com,192.168.0.0/16"
 Better default: keep the variables off and switch them on demand. Works in both zsh and bash.
 
 ```bash
-LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 proxy-on() {
@@ -82,7 +82,7 @@ Usage:
 
 ```console
 $ proxy-on
-proxy on -> http://127.0.0.1:8888
+proxy on -> http://127.0.0.1:1234
 $ curl -s https://example.com > /dev/null && echo ok
 ok
 $ proxy-off
@@ -95,8 +95,8 @@ Avoids polluting the shell environment:
 
 ```bash
 with-proxy() {
-  http_proxy="http://127.0.0.1:8888" https_proxy="http://127.0.0.1:8888" \
-  HTTP_PROXY="http://127.0.0.1:8888" HTTPS_PROXY="http://127.0.0.1:8888" \
+  http_proxy="http://127.0.0.1:1234" https_proxy="http://127.0.0.1:1234" \
+  HTTP_PROXY="http://127.0.0.1:1234" HTTPS_PROXY="http://127.0.0.1:1234" \
   "$@"
 }
 ```
@@ -112,7 +112,7 @@ Prevents a broken shell when localproxy is stopped. Add to `~/.zshrc` / `~/.bash
 
 ```bash
 if command -v localproxy > /dev/null 2>&1 && localproxy status > /dev/null 2>&1; then
-  export http_proxy="http://127.0.0.1:8888"
+  export http_proxy="http://127.0.0.1:1234"
   export https_proxy="$http_proxy"
   export HTTP_PROXY="$http_proxy"
   export HTTPS_PROXY="$http_proxy"
@@ -164,13 +164,13 @@ Some tools need their own configuration:
 
 ```bash
 # git
-git config --global http.proxy http://127.0.0.1:8888
-git config --global https.proxy http://127.0.0.1:8888
+git config --global http.proxy http://127.0.0.1:1234
+git config --global https.proxy http://127.0.0.1:1234
 git config --global --unset http.proxy      # revert
 
 # npm
-npm config set proxy http://127.0.0.1:8888
-npm config set https-proxy http://127.0.0.1:8888
+npm config set proxy http://127.0.0.1:1234
+npm config set https-proxy http://127.0.0.1:1234
 npm config delete proxy                     # revert
 
 # Docker CLI: ~/.docker/config.json ("proxies" section)
@@ -181,7 +181,7 @@ npm config delete proxy                     # revert
 
 ```sshconfig
 Host github.com
-  ProxyCommand nc -X connect -x 127.0.0.1:8888 %h %p
+  ProxyCommand nc -X connect -x 127.0.0.1:1234 %h %p
 ```
 
 ## Verify the integration

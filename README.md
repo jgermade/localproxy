@@ -67,7 +67,7 @@ starts the daemon when it is not running and exports the variables:
 # --- localproxy -----------------------------------------------------------
 export PATH="$HOME/.local/bin:$PATH"
 
-LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then

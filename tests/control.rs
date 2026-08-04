@@ -73,7 +73,7 @@ async fn status_returns_the_running_configuration() {
 
     assert_eq!(
         response,
-        "listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown"
+        "listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown"
     );
     state.shutdown.cancel();
 }

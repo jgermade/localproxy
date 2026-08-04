@@ -89,10 +89,10 @@ If the daemon is already running, the wizard automatically sends a `reload` comm
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · none
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown
 ```
 
 **Gateway upstream** (route through the current default gateway):
@@ -100,13 +100,13 @@ reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · gateway
 ✔ Proxy protocol · http
 ✔ Gateway upstream port · 8080
 ✔ Gateway poll interval (seconds) · 5
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+reloaded: listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
 ```
 
 **Static SOCKS5 upstream** (fixed upstream proxy, no fallback):
@@ -114,13 +114,13 @@ reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gatew
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · static
 ✔ Proxy protocol · socks5
 ✔ Static upstream host · 127.0.0.1
 ✔ Static upstream port · 1080
 ✔ Fallback type · none
-reloaded: listen=127.0.0.1:8888 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
 ```
 
 See [configuration.md](configuration.md) for the full prompt reference and more session examples.
@@ -151,13 +151,13 @@ localproxy daemon
 Plain HTTP:
 
 ```bash
-curl -x http://127.0.0.1:8888 http://example.com
+curl -x http://127.0.0.1:1234 http://example.com
 ```
 
 HTTPS via CONNECT tunnel:
 
 ```bash
-curl -x http://127.0.0.1:8888 https://example.com
+curl -x http://127.0.0.1:1234 https://example.com
 ```
 
 ## Use it from your shell
@@ -165,7 +165,7 @@ curl -x http://127.0.0.1:8888 https://example.com
 Export the proxy variables so every tool picks localproxy up automatically:
 
 ```bash
-export http_proxy="http://127.0.0.1:8888"
+export http_proxy="http://127.0.0.1:1234"
 export https_proxy="$http_proxy"
 export no_proxy="localhost,127.0.0.1,::1"
 ```
@@ -181,7 +181,7 @@ the usual tooling looks at:
 # --- localproxy -----------------------------------------------------------
 export PATH="$HOME/.local/bin:$PATH"
 
-LOCALPROXY_URL="http://127.0.0.1:8888"
+LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then
@@ -241,7 +241,7 @@ localproxy status
 Example output:
 
 ```text
-listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
+listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown
 ```
 
 ## Stop the daemon

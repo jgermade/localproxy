@@ -43,7 +43,7 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 | # | Prompt | Type | Shown when | Default |
 |---|---|---|---|---|
 | 1 | `Listen host` | text | always | current value (`127.0.0.1`) |
-| 2 | `Listen port` | text | always | current value (`8888`) |
+| 2 | `Listen port` | text | always | current value (`1234`) |
 | 3 | `Proxies guardados` | menu: saved proxies + `+ añadir proxy` / `- eliminar proxy` / `continuar` | always | `continuar` |
 | 4 | `Nombre del proxy`, `Proxy protocol`, `Host`, `Puerto`, `Connect timeout (ms)` | text + list | adding or editing a saved proxy | current values |
 | 5 | `Upstream type` | list: `none` / `gateway` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
@@ -100,11 +100,11 @@ After you press <kbd>Enter</kbd>, the line collapses into a confirmation:
 Text inputs show the default in parentheses. Pressing <kbd>Enter</kbd> accepts it:
 
 ```text
-? Listen port (8888) ›
+? Listen port (1234) ›
 ```
 
 ```text
-✔ Listen port · 8888
+✔ Listen port · 1234
 ```
 
 ## Full session examples
@@ -116,10 +116,10 @@ Simplest setup: localproxy listens locally and connects straight to the destinat
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · none
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown
 ```
 
 Resulting `~/.config/localproxy/config.toml`:
@@ -127,7 +127,7 @@ Resulting `~/.config/localproxy/config.toml`:
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "none"
@@ -143,13 +143,13 @@ Routes traffic through an HTTP proxy running on the current default gateway, and
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · gateway
 ✔ Proxy protocol · http
 ✔ Gateway upstream port · 8080
 ✔ Gateway poll interval (seconds) · 5
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+reloaded: listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
 ```
 
 Note that the last line already shows the detected gateway (`192.168.1.1`), so the effective upstream is `192.168.1.1:8080`.
@@ -159,7 +159,7 @@ Resulting config:
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "gateway"
@@ -179,13 +179,13 @@ Forces all traffic through a local SOCKS5 proxy (for example an SSH tunnel opene
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · static
 ✔ Proxy protocol · socks5
 ✔ Static upstream host · 127.0.0.1
 ✔ Static upstream port · 1080
 ✔ Fallback type · none
-reloaded: listen=127.0.0.1:8888 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
 ```
 
 Resulting config:
@@ -193,7 +193,7 @@ Resulting config:
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "static"
@@ -213,7 +213,7 @@ Two proxies: a primary one and a backup one.
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · static
 ✔ Proxy protocol · http
 ✔ Static upstream host · proxy-a.internal
@@ -222,7 +222,7 @@ $ localproxy config
 ✔ Proxy protocol · http
 ✔ Fallback host · proxy-b.internal
 ✔ Fallback port · 8080
-reloaded: listen=127.0.0.1:8888 upstream=static:http:proxy-a.internal:8080 fallback=static:http:proxy-b.internal:8080 gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=static:http:proxy-a.internal:8080 fallback=static:http:proxy-b.internal:8080 gateway=unknown
 ```
 
 ### Example 5 — Running the wizard when the daemon is stopped
@@ -232,7 +232,7 @@ The config is still written to disk; only the live reload is skipped.
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · none
 ✔ Fallback type · direct
 config saved; daemon not notified: No such file or directory (os error 2)
@@ -287,7 +287,7 @@ localproxy reload
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "none"
@@ -308,7 +308,7 @@ connect_timeout_ms = 3000
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `host` | IP string | `"127.0.0.1"` | Local bind address. |
-| `port` | integer | `8888` | Local bind port. |
+| `port` | integer | `1234` | Local bind port. |
 
 ## [[proxy]]
 
@@ -479,7 +479,7 @@ No upstream, direct fallback. Useful for testing connectivity without a proxy.
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "none"
@@ -495,7 +495,7 @@ Route through whatever proxy the corporate network gateway exposes, fall back to
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "gateway"
@@ -513,7 +513,7 @@ type = "direct"
 ```toml
 [listen]
 host = "127.0.0.1"
-port = 8888
+port = 1234
 
 [upstream]
 type = "static"

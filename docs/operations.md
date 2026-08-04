@@ -102,7 +102,7 @@ localproxy stop
 ## `localproxy status` output
 
 ```text
-listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
 ```
 
 Fields: `listen`, `upstream`, `fallback`, `gateway` (current detected IP, or `unknown`).
@@ -114,10 +114,10 @@ Fields: `listen`, `upstream`, `fallback`, `gateway` (current detected IP, or `un
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · none
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown
 ```
 
 If the daemon is not running, the config is still written and the last line becomes:
@@ -143,13 +143,13 @@ See [configuration.md](configuration.md) for the complete `localproxy config` pr
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · gateway
 ✔ Proxy protocol · http
 ✔ Gateway upstream port · 8080
 ✔ Gateway poll interval (seconds) · 5
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+reloaded: listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
 ```
 
 **Disable the upstream temporarily (go direct):**
@@ -157,10 +157,10 @@ reloaded: listen=127.0.0.1:8888 upstream=gateway:http:8080 fallback=direct gatew
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · none
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown
 ```
 
 **Point to a static SOCKS5 proxy:**
@@ -168,13 +168,13 @@ reloaded: listen=127.0.0.1:8888 upstream=none fallback=direct gateway=unknown
 ```console
 $ localproxy config
 ✔ Listen host · 127.0.0.1
-✔ Listen port · 8888
+✔ Listen port · 1234
 ✔ Upstream type · static
 ✔ Proxy protocol · socks5
 ✔ Static upstream host · 127.0.0.1
 ✔ Static upstream port · 1080
 ✔ Fallback type · none
-reloaded: listen=127.0.0.1:8888 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
+reloaded: listen=127.0.0.1:1234 upstream=static:socks5:127.0.0.1:1080 fallback=none gateway=unknown
 ```
 
 **Change the listen port** — the config is reloaded but the listener stays on the old port until the daemon restarts:

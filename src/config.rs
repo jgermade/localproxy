@@ -741,7 +741,7 @@ fn default_listen_host() -> IpAddr {
 }
 
 fn default_listen_port() -> u16 {
-    8888
+    1234
 }
 
 fn default_poll_interval_secs() -> u64 {
