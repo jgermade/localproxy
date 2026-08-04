@@ -1,5 +1,9 @@
 # localproxy
 
+<p align="center">
+  <img src="./localproxy-logo.svg" alt="localproxy" width="640" />
+</p>
+
 localproxy is a local proxy daemon written in Rust. It listens on localhost and forwards HTTP and HTTPS traffic through a configurable resolution chain:
 
 1. optional primary upstream
@@ -173,7 +177,7 @@ CARGO_HOME=$PWD/.cargo-home cargo check
 `build.yml` runs fmt, clippy, `cargo test` and a coverage gate (`scripts/coverage.sh --fail-under 60`)
 before building the binaries.
 
-`release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries attached.
+`release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries atta[...]
 
 ## License
 
