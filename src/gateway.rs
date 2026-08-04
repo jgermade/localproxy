@@ -101,7 +101,7 @@ async fn detect_linux_gateway() -> Result<IpAddr> {
     parse_linux_ip_route(&String::from_utf8_lossy(&output.stdout))
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 fn parse_gateway_output(output: &str) -> Result<IpAddr> {
     output
         .lines()
@@ -112,7 +112,7 @@ fn parse_gateway_output(output: &str) -> Result<IpAddr> {
         .context("gateway inválido")
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 fn parse_linux_proc_route(contents: &str) -> Result<Option<IpAddr>> {
     for line in contents.lines().skip(1) {
         let columns: Vec<&str> = line.split_whitespace().collect();
@@ -125,7 +125,7 @@ fn parse_linux_proc_route(contents: &str) -> Result<Option<IpAddr>> {
     Ok(None)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 fn parse_linux_ip_route(contents: &str) -> Result<IpAddr> {
     let gateway = contents
         .split_whitespace()
@@ -135,4 +135,130 @@ fn parse_linux_ip_route(contents: &str) -> Result<IpAddr> {
         .ok_or_else(|| anyhow!("no se encontró gateway en ip route"))?;
 
     gateway.parse().context("gateway inválido")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::{test_paths, test_state};
+    use std::net::Ipv4Addr;
+
+    #[tokio::test]
+    async fn the_detector_returns_immediately_when_already_cancelled() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = test_state(test_paths(dir.path()), config::AppConfig::default());
+        state.shutdown.cancel();
+
+        run(state).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn the_detector_clears_the_gateway_outside_gateway_mode() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = test_state(test_paths(dir.path()), config::AppConfig::default());
+        *state.gateway_ip.write().await = Some(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)));
+
+        let task_state = state.clone();
+        let handle = tokio::spawn(async move { run(task_state).await });
+
+        for _ in 0..200 {
+            if state.gateway_ip.read().await.is_none() {
+                break;
+            }
+            time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(state.gateway_ip.read().await.is_none());
+
+        state.shutdown.cancel();
+        handle.await.unwrap().unwrap();
+    }
+
+    const MACOS_ROUTE_OUTPUT: &str = "   route to: default\n\
+destination: default\n\
+       mask: default\n\
+    gateway: 192.168.1.1\n\
+  interface: en0\n";
+
+    #[test]
+    fn macos_route_output_yields_the_gateway() {
+        assert_eq!(
+            parse_gateway_output(MACOS_ROUTE_OUTPUT).unwrap(),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))
+        );
+    }
+
+    #[test]
+    fn macos_route_output_without_gateway_line_fails() {
+        let error = parse_gateway_output("   route to: default\n  interface: en0\n").unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("no se encontró la línea gateway")
+        );
+    }
+
+    #[test]
+    fn macos_route_output_with_an_invalid_address_fails() {
+        let error = parse_gateway_output("    gateway: not-an-ip\n").unwrap_err();
+
+        assert!(error.to_string().contains("gateway inválido"));
+    }
+
+    #[test]
+    fn proc_route_decodes_the_default_route_gateway() {
+        // 0101A8C0 is 192.168.1.1 in little-endian hex.
+        let contents = "Iface\tDestination\tGateway\tFlags\n\
+eth0\t0000FEA9\t00000000\t0001\n\
+eth0\t00000000\t0101A8C0\t0003\n";
+
+        assert_eq!(
+            parse_linux_proc_route(contents).unwrap(),
+            Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)))
+        );
+    }
+
+    #[test]
+    fn proc_route_without_a_default_route_returns_none() {
+        let contents = "Iface\tDestination\tGateway\tFlags\n\
+eth0\t0000FEA9\t00000000\t0001\n";
+
+        assert!(parse_linux_proc_route(contents).unwrap().is_none());
+    }
+
+    #[test]
+    fn proc_route_with_an_invalid_hex_gateway_fails() {
+        let contents = "Iface\tDestination\tGateway\n\
+eth0\t00000000\tZZZZZZZZ\n";
+
+        assert!(parse_linux_proc_route(contents).is_err());
+    }
+
+    #[test]
+    fn ip_route_output_yields_the_gateway() {
+        let contents = "default via 10.0.0.1 dev eth0 proto dhcp metric 100\n";
+
+        assert_eq!(
+            parse_linux_ip_route(contents).unwrap(),
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))
+        );
+    }
+
+    #[test]
+    fn ip_route_output_without_via_fails() {
+        let error = parse_linux_ip_route("default dev eth0 scope link\n").unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("no se encontró gateway en ip route")
+        );
+    }
+
+    #[test]
+    fn ip_route_output_with_an_invalid_address_fails() {
+        let error = parse_linux_ip_route("default via nope dev eth0\n").unwrap_err();
+
+        assert!(error.to_string().contains("gateway inválido"));
+    }
 }

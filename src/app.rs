@@ -66,6 +66,7 @@ pub async fn run_daemon(paths: config::AppPaths) -> Result<()> {
     proxy_result
 }
 
+#[derive(Debug)]
 pub struct PidGuard {
     lock_file: std::fs::File,
     pid_path: PathBuf,
@@ -129,4 +130,88 @@ pub fn start_detached(paths: &config::AppPaths) -> Result<u32> {
         .context("no se pudo arrancar zproxy daemon en background")?;
 
     Ok(child.id())
+}
+
+#[cfg(test)]
+pub fn test_paths(dir: &std::path::Path) -> config::AppPaths {
+    let config_dir = dir.join("config");
+    config::AppPaths {
+        config_file: config_dir.join("config.toml"),
+        config_dir,
+        state_dir: dir.join("state"),
+    }
+}
+
+#[cfg(test)]
+pub fn test_state(paths: config::AppPaths, config: config::AppConfig) -> SharedState {
+    SharedState {
+        paths,
+        config: Arc::new(RwLock::new(config)),
+        gateway_ip: Arc::new(RwLock::new(None)),
+        shutdown: CancellationToken::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pid_guard_writes_the_pid_file_and_removes_it_on_drop() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = test_paths(dir.path());
+        paths.ensure_dirs().unwrap();
+
+        let guard = PidGuard::acquire(&paths).unwrap();
+
+        let pid = fs::read_to_string(paths.pid_file()).unwrap();
+        assert_eq!(pid.trim(), std::process::id().to_string());
+        assert!(paths.lock_file().exists());
+
+        drop(guard);
+        assert!(!paths.pid_file().exists());
+    }
+
+    #[test]
+    fn pid_guard_rejects_a_second_instance() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = test_paths(dir.path());
+        paths.ensure_dirs().unwrap();
+
+        let _guard = PidGuard::acquire(&paths).unwrap();
+        let error = PidGuard::acquire(&paths).unwrap_err();
+
+        assert!(error.to_string().contains("ya está corriendo"));
+    }
+
+    #[test]
+    fn pid_guard_can_be_reacquired_after_release() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = test_paths(dir.path());
+        paths.ensure_dirs().unwrap();
+
+        drop(PidGuard::acquire(&paths).unwrap());
+
+        assert!(PidGuard::acquire(&paths).is_ok());
+    }
+
+    #[test]
+    fn pid_guard_fails_when_the_state_dir_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = test_paths(&dir.path().join("missing"));
+
+        let error = PidGuard::acquire(&paths).unwrap_err();
+
+        assert!(error.to_string().contains("no se pudo abrir"));
+    }
+
+    #[test]
+    fn test_state_starts_without_a_gateway_and_not_cancelled() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = test_state(test_paths(dir.path()), config::AppConfig::default());
+
+        assert!(!state.shutdown.is_cancelled());
+        state.shutdown.cancel();
+        assert!(state.shutdown.is_cancelled());
+    }
 }

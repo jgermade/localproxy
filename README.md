@@ -25,11 +25,29 @@ Not yet implemented:
 - Multi-level fallback chains.
 - Upstream proxy authentication.
 
+## Install
+
+Download the binary for your platform from the [latest release](https://github.com/jgermade/zproxy/releases/latest):
+
+```bash
+# macOS (Apple Silicon)
+curl -fsSL -o ~/.local/bin/zproxy \
+  https://github.com/jgermade/zproxy/releases/latest/download/zproxy-macos-aarch64
+chmod +x ~/.local/bin/zproxy
+```
+
+Available assets: `zproxy-macos-aarch64`, `zproxy-macos-x86_64`, `zproxy-linux-x86_64`,
+`zproxy-linux-aarch64`. See [docs/installation.md](docs/installation.md) for platform detection,
+Gatekeeper notes, upgrades and uninstall.
+
 ## Documentation
 
+- [docs/installation.md](docs/installation.md) — install from the release binaries, upgrade and uninstall.
 - [docs/quickstart.md](docs/quickstart.md) — build, first run and basic usage.
+- [docs/shell-integration.md](docs/shell-integration.md) — zsh/bash proxy variables, toggles and aliases.
 - [docs/configuration.md](docs/configuration.md) — config format, wizard walkthrough and examples.
 - [docs/operations.md](docs/operations.md) — daemon modes, service management, logs and daily operations.
+- [docs/testing.md](docs/testing.md) — test suite and coverage.
 - [macos-proxy-rust-design.md](macos-proxy-rust-design.md) — original design and evolution backlog.
 
 ## Commands
@@ -69,10 +87,13 @@ Not yet implemented:
 ```bash
 cargo fmt --check
 cargo check
+cargo test
 cargo run -- paths
 cargo run -- config
 cargo run -- daemon
 ```
+
+See [docs/testing.md](docs/testing.md) for the test layout and how to measure coverage.
 
 If the global Cargo cache is locked by another process, isolate it:
 
@@ -86,5 +107,8 @@ CARGO_HOME=$PWD/.cargo-home cargo check
 |---|---|
 | [build.yml](.github/workflows/build.yml) | push / PR to `main` |
 | [release.yml](.github/workflows/release.yml) | manual dispatch with `patch` / `minor` / `major` input |
+
+`build.yml` runs fmt, clippy, `cargo test` and a coverage gate (`scripts/coverage.sh --fail-under 70`)
+before building the binaries.
 
 `release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries attached.

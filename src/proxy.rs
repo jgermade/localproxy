@@ -461,3 +461,678 @@ enum Route {
     Direct,
     Proxy(ProxyEndpoint),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        app::{test_paths, test_state},
+        config::{FallbackConfig, ListenConfig, SavedProxy, UpstreamConfig},
+    };
+    use std::{
+        net::{Ipv4Addr, SocketAddr},
+        sync::{Arc, Mutex},
+    };
+    use tempfile::TempDir;
+    use tokio::{net::TcpListener, time::timeout};
+
+    const TEST_TIMEOUT: Duration = Duration::from_secs(10);
+
+    fn request(method: &str, target: &str, headers: &[(&str, &str)]) -> HttpRequestHead {
+        HttpRequestHead {
+            method: method.to_string(),
+            target: target.to_string(),
+            version: "HTTP/1.1".to_string(),
+            headers: headers
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+        }
+    }
+
+    fn endpoint(protocol: ProxyProtocol, host: &str, port: u16) -> ProxyEndpoint {
+        ProxyEndpoint {
+            protocol,
+            host: host.to_string(),
+            port,
+            connect_timeout_ms: 3_000,
+        }
+    }
+
+    async fn free_port() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        listener.local_addr().unwrap().port()
+    }
+
+    /// Minimal origin server: answers every request with its own request line.
+    async fn spawn_origin() -> SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut buffer = vec![0_u8; 4096];
+                    let read = socket.read(&mut buffer).await.unwrap_or(0);
+                    let text = String::from_utf8_lossy(&buffer[..read]).to_string();
+                    let body = text.lines().next().unwrap_or("").to_string();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = socket.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+
+        addr
+    }
+
+    /// Fake HTTP upstream proxy: records request lines and answers 200 (or 403 CONNECT).
+    async fn spawn_fake_http_proxy(accept_connect: bool) -> (SocketAddr, Arc<Mutex<Vec<String>>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let recorder = seen.clone();
+
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let recorder = recorder.clone();
+                tokio::spawn(async move {
+                    let mut buffer = vec![0_u8; 4096];
+                    let read = socket.read(&mut buffer).await.unwrap_or(0);
+                    let text = String::from_utf8_lossy(&buffer[..read]).to_string();
+                    let request_line = text.lines().next().unwrap_or("").to_string();
+                    recorder.lock().unwrap().push(request_line.clone());
+
+                    let response = if request_line.starts_with("CONNECT") {
+                        if accept_connect {
+                            "HTTP/1.1 200 Connection Established\r\n\r\n".to_string()
+                        } else {
+                            "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n".to_string()
+                        }
+                    } else {
+                        let body = format!("via-proxy {request_line}");
+                        format!(
+                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        )
+                    };
+                    let _ = socket.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+
+        (addr, seen)
+    }
+
+    async fn spawn_proxy(config: AppConfig) -> (crate::app::SharedState, SocketAddr, TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = test_paths(dir.path());
+        paths.ensure_dirs().unwrap();
+        let listen = config.listen.socket_addr();
+        let state = test_state(paths, config);
+
+        let server_state = state.clone();
+        tokio::spawn(async move { serve(server_state).await });
+
+        for _ in 0..200 {
+            if TcpStream::connect(listen).await.is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        (state, listen, dir)
+    }
+
+    fn config_listening_on(port: u16) -> AppConfig {
+        AppConfig {
+            listen: ListenConfig {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port,
+            },
+            ..AppConfig::default()
+        }
+    }
+
+    async fn send_through_proxy(proxy: SocketAddr, payload: &str) -> String {
+        let mut client = TcpStream::connect(proxy).await.unwrap();
+        client.write_all(payload.as_bytes()).await.unwrap();
+
+        let mut response = Vec::new();
+        timeout(TEST_TIMEOUT, client.read_to_end(&mut response))
+            .await
+            .expect("timeout leyendo la respuesta del proxy")
+            .unwrap();
+        String::from_utf8_lossy(&response).to_string()
+    }
+
+    #[test]
+    fn header_end_is_detected_after_the_blank_line() {
+        assert_eq!(find_header_end(b"GET / HTTP/1.1\r\n\r\nbody"), Some(18));
+        assert!(find_header_end(b"GET / HTTP/1.1\r\n").is_none());
+        assert!(find_header_end(b"").is_none());
+    }
+
+    #[test]
+    fn request_heads_are_parsed_into_method_target_version_and_headers() {
+        let head =
+            parse_request_head(b"GET /index.html HTTP/1.1\r\nHost: example.com\r\nX-A:  b \r\n")
+                .unwrap();
+
+        assert_eq!(head.method, "GET");
+        assert_eq!(head.target, "/index.html");
+        assert_eq!(head.version, "HTTP/1.1");
+        assert_eq!(
+            head.headers,
+            vec![
+                ("Host".to_string(), "example.com".to_string()),
+                ("X-A".to_string(), "b".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn incomplete_or_invalid_request_heads_are_rejected() {
+        assert!(parse_request_head(b"GET /\r\n").is_err());
+        assert!(parse_request_head(b"\r\n").is_err());
+        assert!(parse_request_head(b"GET / HTTP/1.1\r\nbroken-header\r\n").is_err());
+        assert!(parse_request_head(&[0xff, 0xfe]).is_err());
+    }
+
+    #[test]
+    fn response_heads_are_parsed_into_version_status_and_reason() {
+        let head = parse_response_head(b"HTTP/1.1 200 Connection Established\r\n").unwrap();
+
+        assert_eq!(head.version, "HTTP/1.1");
+        assert_eq!(head.status, 200);
+        assert_eq!(head.reason, "Connection Established");
+    }
+
+    #[test]
+    fn invalid_response_heads_are_rejected() {
+        assert!(parse_response_head(b"HTTP/1.1\r\n").is_err());
+        assert!(parse_response_head(b"HTTP/1.1 abc\r\n").is_err());
+        assert!(parse_response_head(&[0xff, 0xfe]).is_err());
+    }
+
+    #[tokio::test]
+    async fn reading_a_head_splits_the_buffered_body() {
+        let mut stream: &[u8] = b"POST /submit HTTP/1.1\r\nHost: example.com\r\n\r\nname=value";
+
+        let (head, body) = read_http_head(&mut stream).await.unwrap();
+
+        assert_eq!(head.method, "POST");
+        assert_eq!(body, b"name=value");
+    }
+
+    #[tokio::test]
+    async fn reading_a_head_fails_when_the_connection_closes_early() {
+        let mut stream: &[u8] = b"GET / HTTP/1.1\r\nHost: example.com\r\n";
+
+        let error = read_http_head(&mut stream).await.unwrap_err();
+
+        assert!(error.to_string().contains("se cerró antes de completar"));
+    }
+
+    #[tokio::test]
+    async fn oversized_heads_are_rejected() {
+        let payload = format!(
+            "GET / HTTP/1.1\r\nX-Big: {}\r\n",
+            "a".repeat(MAX_HEADER_BYTES)
+        );
+        let mut stream: &[u8] = payload.as_bytes();
+
+        let error = read_http_head(&mut stream).await.unwrap_err();
+
+        assert!(error.to_string().contains("demasiado grandes"));
+    }
+
+    #[tokio::test]
+    async fn reading_a_response_head_fails_when_the_connection_closes_early() {
+        let mut stream: &[u8] = b"HTTP/1.1 200 OK\r\n";
+
+        let error = read_http_response(&mut stream).await.unwrap_err();
+
+        assert!(error.to_string().contains("se cerró antes de completar"));
+    }
+
+    #[tokio::test]
+    async fn oversized_responses_are_rejected() {
+        let payload = format!(
+            "HTTP/1.1 200 OK\r\nX-Big: {}\r\n",
+            "a".repeat(MAX_HEADER_BYTES)
+        );
+        let mut stream: &[u8] = payload.as_bytes();
+
+        let error = read_http_response(&mut stream).await.unwrap_err();
+
+        assert!(error.to_string().contains("demasiado grande"));
+    }
+
+    #[test]
+    fn absolute_form_targets_yield_authority_and_path() {
+        let destination =
+            extract_destination(&request("GET", "http://example.com/a?b=c", &[])).unwrap();
+
+        assert_eq!(destination.authority, "example.com:80");
+        assert_eq!(destination.path, "/a?b=c");
+    }
+
+    #[test]
+    fn absolute_form_targets_default_to_the_scheme_port() {
+        assert_eq!(
+            extract_destination(&request("GET", "https://example.com/", &[]))
+                .unwrap()
+                .authority,
+            "example.com:443"
+        );
+        assert_eq!(
+            extract_destination(&request("GET", "http://example.com:8080/", &[]))
+                .unwrap()
+                .authority,
+            "example.com:8080"
+        );
+    }
+
+    #[test]
+    fn absolute_form_targets_without_a_path_default_to_root() {
+        assert_eq!(
+            extract_destination(&request("GET", "http://example.com", &[]))
+                .unwrap()
+                .path,
+            "/"
+        );
+    }
+
+    #[test]
+    fn origin_form_targets_use_the_host_header() {
+        let destination =
+            extract_destination(&request("GET", "/a", &[("Host", "example.com")])).unwrap();
+        assert_eq!(destination.authority, "example.com:80");
+        assert_eq!(destination.path, "/a");
+
+        let explicit =
+            extract_destination(&request("GET", "/a", &[("host", "example.com:8080")])).unwrap();
+        assert_eq!(explicit.authority, "example.com:8080");
+    }
+
+    #[test]
+    fn origin_form_targets_without_a_host_header_are_rejected() {
+        let error = extract_destination(&request("GET", "/a", &[])).unwrap_err();
+
+        assert!(error.to_string().contains("sin header Host"));
+    }
+
+    #[test]
+    fn absolute_form_targets_without_a_host_are_rejected() {
+        assert!(extract_destination(&request("GET", "file:///tmp/x", &[])).is_err());
+    }
+
+    #[test]
+    fn direct_requests_use_origin_form_and_drop_proxy_headers() {
+        let head = request(
+            "GET",
+            "http://example.com/a",
+            &[("Host", "example.com"), ("Proxy-Connection", "Keep-Alive")],
+        );
+        let destination = extract_destination(&head).unwrap();
+
+        let bytes = build_direct_request(&head, &destination);
+        let text = String::from_utf8(bytes).unwrap();
+
+        assert!(text.starts_with("GET /a HTTP/1.1\r\n"));
+        assert!(text.contains("Host: example.com\r\n"));
+        assert!(!text.to_lowercase().contains("proxy-connection"));
+        assert!(text.ends_with("\r\n\r\n"));
+    }
+
+    #[test]
+    fn proxied_requests_keep_the_absolute_form_target() {
+        let head = request("GET", "http://example.com/a", &[("Host", "example.com")]);
+        let destination = extract_destination(&head).unwrap();
+
+        let text = String::from_utf8(build_http_proxy_request(&head, &destination)).unwrap();
+
+        assert!(text.starts_with("GET http://example.com/a HTTP/1.1\r\n"));
+    }
+
+    #[test]
+    fn proxied_requests_rebuild_the_absolute_form_from_origin_form() {
+        let head = request("GET", "/a", &[("Host", "example.com")]);
+        let destination = extract_destination(&head).unwrap();
+
+        let text = String::from_utf8(build_http_proxy_request(&head, &destination)).unwrap();
+
+        assert!(text.starts_with("GET http://example.com:80/a HTTP/1.1\r\n"));
+    }
+
+    #[test]
+    fn default_config_only_routes_direct() {
+        let routes = resolve_routes_from_config(&AppConfig::default(), None);
+
+        assert_eq!(routes.len(), 1);
+        assert_eq!(describe_route(&routes[0]), "direct");
+    }
+
+    #[test]
+    fn gateway_upstream_is_skipped_until_the_gateway_is_known() {
+        let config = AppConfig {
+            upstream: UpstreamConfig::Gateway {
+                protocol: ProxyProtocol::Http,
+                port: 8080,
+                poll_interval_secs: 5,
+                connect_timeout_ms: 3_000,
+            },
+            ..AppConfig::default()
+        };
+
+        let without_gateway = resolve_routes_from_config(&config, None);
+        assert_eq!(
+            without_gateway
+                .iter()
+                .map(describe_route)
+                .collect::<Vec<_>>(),
+            vec!["direct"]
+        );
+
+        let with_gateway =
+            resolve_routes_from_config(&config, Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))));
+        assert_eq!(
+            with_gateway.iter().map(describe_route).collect::<Vec<_>>(),
+            vec!["http://192.168.1.1:8080", "direct"]
+        );
+    }
+
+    #[test]
+    fn upstream_fallback_and_direct_are_tried_in_order() {
+        let config = AppConfig {
+            upstream: UpstreamConfig::Saved {
+                name: "corp".to_string(),
+            },
+            fallback: FallbackConfig::Static {
+                protocol: ProxyProtocol::Socks5,
+                host: "127.0.0.1".to_string(),
+                port: 1080,
+                connect_timeout_ms: 3_000,
+            },
+            proxies: vec![SavedProxy {
+                name: "corp".to_string(),
+                protocol: ProxyProtocol::Http,
+                host: "10.0.0.1".to_string(),
+                port: 3128,
+                connect_timeout_ms: 3_000,
+            }],
+            ..AppConfig::default()
+        };
+
+        let routes = resolve_routes_from_config(&config, None);
+
+        assert_eq!(
+            routes.iter().map(describe_route).collect::<Vec<_>>(),
+            vec!["http://10.0.0.1:3128", "socks5://127.0.0.1:1080"]
+        );
+    }
+
+    #[test]
+    fn a_static_upstream_without_fallback_has_no_direct_route() {
+        let config = AppConfig {
+            upstream: UpstreamConfig::Static {
+                protocol: ProxyProtocol::Http,
+                host: "10.0.0.1".to_string(),
+                port: 3128,
+                connect_timeout_ms: 3_000,
+            },
+            fallback: FallbackConfig::None,
+            ..AppConfig::default()
+        };
+
+        let routes = resolve_routes_from_config(&config, None);
+
+        assert_eq!(
+            routes.iter().map(describe_route).collect::<Vec<_>>(),
+            vec!["http://10.0.0.1:3128"]
+        );
+    }
+
+    #[tokio::test]
+    async fn routes_are_resolved_from_the_shared_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = test_state(test_paths(dir.path()), AppConfig::default());
+
+        let routes = resolve_routes(&state).await;
+
+        assert_eq!(routes.len(), 1);
+        assert!(matches!(routes[0], Route::Direct));
+    }
+
+    #[test]
+    fn connect_timeouts_are_never_zero() {
+        assert_eq!(
+            timeout_for(&endpoint(ProxyProtocol::Http, "127.0.0.1", 8080)),
+            Duration::from_millis(3_000)
+        );
+
+        let mut instant = endpoint(ProxyProtocol::Http, "127.0.0.1", 8080);
+        instant.connect_timeout_ms = 0;
+        assert_eq!(timeout_for(&instant), Duration::from_millis(1));
+    }
+
+    #[test]
+    fn routes_are_rendered_for_logging() {
+        assert_eq!(describe_route(&Route::Direct), "direct");
+        assert_eq!(
+            describe_route(&Route::Proxy(endpoint(
+                ProxyProtocol::Socks5,
+                "127.0.0.1",
+                1080
+            ))),
+            "socks5://127.0.0.1:1080"
+        );
+        assert_eq!(protocol_name(ProxyProtocol::Http), "http");
+        assert_eq!(protocol_name(ProxyProtocol::Socks5), "socks5");
+    }
+
+    #[tokio::test]
+    async fn plain_http_requests_are_forwarded_directly() {
+        let origin = spawn_origin().await;
+        let (state, proxy_addr, _dir) = spawn_proxy(config_listening_on(free_port().await)).await;
+
+        let response = send_through_proxy(
+            proxy_addr,
+            &format!(
+                "GET http://{origin}/hello HTTP/1.1\r\nHost: {origin}\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            ),
+        )
+        .await;
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("GET /hello HTTP/1.1"));
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn https_requests_are_tunnelled_with_connect() {
+        let origin = spawn_origin().await;
+        let (state, proxy_addr, _dir) = spawn_proxy(config_listening_on(free_port().await)).await;
+
+        let mut client = TcpStream::connect(proxy_addr).await.unwrap();
+        client
+            .write_all(format!("CONNECT {origin} HTTP/1.1\r\nHost: {origin}\r\n\r\n").as_bytes())
+            .await
+            .unwrap();
+
+        let mut established = [0_u8; 39];
+        timeout(TEST_TIMEOUT, client.read_exact(&mut established))
+            .await
+            .expect("timeout esperando la respuesta CONNECT")
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&established),
+            "HTTP/1.1 200 Connection Established\r\n\r\n"
+        );
+
+        client
+            .write_all(b"GET /tunnelled HTTP/1.1\r\nHost: origin\r\n\r\n")
+            .await
+            .unwrap();
+
+        let mut tunnelled = Vec::new();
+        timeout(TEST_TIMEOUT, client.read_to_end(&mut tunnelled))
+            .await
+            .expect("timeout leyendo por el túnel")
+            .unwrap();
+
+        assert!(String::from_utf8_lossy(&tunnelled).contains("GET /tunnelled HTTP/1.1"));
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn requests_go_through_the_configured_http_upstream() {
+        let (upstream, seen) = spawn_fake_http_proxy(true).await;
+        let mut config = config_listening_on(free_port().await);
+        config.upstream = UpstreamConfig::Static {
+            protocol: ProxyProtocol::Http,
+            host: upstream.ip().to_string(),
+            port: upstream.port(),
+            connect_timeout_ms: 3_000,
+        };
+        config.fallback = FallbackConfig::None;
+        let (state, proxy_addr, _dir) = spawn_proxy(config).await;
+
+        let response = send_through_proxy(
+            proxy_addr,
+            "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.contains("via-proxy GET http://example.com/a HTTP/1.1"));
+        assert_eq!(
+            seen.lock().unwrap().first().unwrap(),
+            "GET http://example.com/a HTTP/1.1"
+        );
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn connect_is_tunnelled_through_the_configured_http_upstream() {
+        let (upstream, seen) = spawn_fake_http_proxy(true).await;
+        let mut config = config_listening_on(free_port().await);
+        config.upstream = UpstreamConfig::Static {
+            protocol: ProxyProtocol::Http,
+            host: upstream.ip().to_string(),
+            port: upstream.port(),
+            connect_timeout_ms: 3_000,
+        };
+        config.fallback = FallbackConfig::None;
+        let (state, proxy_addr, _dir) = spawn_proxy(config).await;
+
+        let response = send_through_proxy(
+            proxy_addr,
+            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.starts_with("HTTP/1.1 200 Connection Established"));
+        assert_eq!(
+            seen.lock().unwrap().first().unwrap(),
+            "CONNECT example.com:443 HTTP/1.1"
+        );
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn a_rejected_connect_upstream_falls_back_to_502() {
+        let (upstream, _seen) = spawn_fake_http_proxy(false).await;
+        let mut config = config_listening_on(free_port().await);
+        config.upstream = UpstreamConfig::Static {
+            protocol: ProxyProtocol::Http,
+            host: upstream.ip().to_string(),
+            port: upstream.port(),
+            connect_timeout_ms: 3_000,
+        };
+        config.fallback = FallbackConfig::None;
+        let (state, proxy_addr, _dir) = spawn_proxy(config).await;
+
+        let response = send_through_proxy(
+            proxy_addr,
+            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.starts_with("HTTP/1.1 502 Bad Gateway"));
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_upstream_falls_back_to_the_direct_route() {
+        let origin = spawn_origin().await;
+        let dead_port = free_port().await;
+        let mut config = config_listening_on(free_port().await);
+        config.upstream = UpstreamConfig::Static {
+            protocol: ProxyProtocol::Http,
+            host: "127.0.0.1".to_string(),
+            port: dead_port,
+            connect_timeout_ms: 200,
+        };
+        config.fallback = FallbackConfig::Direct;
+        let (state, proxy_addr, _dir) = spawn_proxy(config).await;
+
+        let response = send_through_proxy(
+            proxy_addr,
+            &format!("GET http://{origin}/recovered HTTP/1.1\r\nHost: {origin}\r\n\r\n"),
+        )
+        .await;
+
+        assert!(response.contains("GET /recovered HTTP/1.1"));
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn requests_without_any_working_route_return_502() {
+        let dead_port = free_port().await;
+        let mut config = config_listening_on(free_port().await);
+        config.upstream = UpstreamConfig::Static {
+            protocol: ProxyProtocol::Http,
+            host: "127.0.0.1".to_string(),
+            port: dead_port,
+            connect_timeout_ms: 200,
+        };
+        config.fallback = FallbackConfig::None;
+        let (state, proxy_addr, _dir) = spawn_proxy(config).await;
+
+        let response = send_through_proxy(
+            proxy_addr,
+            "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\n\r\n",
+        )
+        .await;
+
+        assert!(response.starts_with("HTTP/1.1 502 Bad Gateway"));
+        state.shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn serve_fails_when_the_listen_address_is_already_taken() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let taken = listener.local_addr().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let state = test_state(test_paths(dir.path()), config_listening_on(taken.port()));
+
+        let error = serve(state).await.unwrap_err();
+
+        assert!(error.to_string().contains("no se pudo escuchar"));
+    }
+
+    #[tokio::test]
+    async fn serve_stops_when_the_shutdown_token_is_cancelled() {
+        let (state, _addr, _dir) = spawn_proxy(config_listening_on(free_port().await)).await;
+
+        state.shutdown.cancel();
+
+        let stopped = timeout(TEST_TIMEOUT, state.shutdown.cancelled()).await;
+        assert!(stopped.is_ok());
+    }
+}

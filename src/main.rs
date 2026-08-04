@@ -187,3 +187,127 @@ fn run_service(paths: config::AppPaths, command: ServiceCommand) -> Result<()> {
         ServiceCommand::Uninstall => service::uninstall(&paths),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap()
+    }
+
+    #[test]
+    fn the_cli_definition_is_valid() {
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn no_subcommand_falls_back_to_the_daemon() {
+        assert!(parse(&["zproxy"]).command.is_none());
+    }
+
+    #[test]
+    fn plain_subcommands_are_parsed() {
+        assert!(matches!(
+            parse(&["zproxy", "daemon"]).command,
+            Some(Command::Daemon)
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "config"]).command,
+            Some(Command::Config)
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "status"]).command,
+            Some(Command::Status)
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "reload"]).command,
+            Some(Command::Reload)
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "stop"]).command,
+            Some(Command::Stop)
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "paths"]).command,
+            Some(Command::Paths)
+        ));
+    }
+
+    #[test]
+    fn start_is_attached_unless_detached_is_requested() {
+        assert!(matches!(
+            parse(&["zproxy", "start"]).command,
+            Some(Command::Start { detached: false })
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "start", "--detached"]).command,
+            Some(Command::Start { detached: true })
+        ));
+    }
+
+    #[test]
+    fn logs_defaults_to_one_hundred_lines_without_following() {
+        assert!(matches!(
+            parse(&["zproxy", "logs"]).command,
+            Some(Command::Logs {
+                lines: 100,
+                follow: false,
+                detached: false,
+            })
+        ));
+        assert!(matches!(
+            parse(&["zproxy", "logs", "--lines", "5", "--follow", "--detached"]).command,
+            Some(Command::Logs {
+                lines: 5,
+                follow: true,
+                detached: true,
+            })
+        ));
+    }
+
+    #[test]
+    fn service_subcommands_are_parsed() {
+        for (arg, expected) in [
+            ("install", ServiceCommand::Install),
+            ("start", ServiceCommand::Start),
+            ("restart", ServiceCommand::Restart),
+            ("status", ServiceCommand::Status),
+            ("stop", ServiceCommand::Stop),
+            ("uninstall", ServiceCommand::Uninstall),
+        ] {
+            let parsed = parse(&["zproxy", "service", arg]).command;
+            let Some(Command::Service { command }) = parsed else {
+                panic!("se esperaba un subcomando de service para {arg}");
+            };
+            assert_eq!(
+                std::mem::discriminant(&command),
+                std::mem::discriminant(&expected)
+            );
+        }
+    }
+
+    #[test]
+    fn service_logs_accepts_the_same_flags_as_logs() {
+        let parsed = parse(&["zproxy", "service", "logs", "--lines", "20", "--follow"]).command;
+
+        assert!(matches!(
+            parsed,
+            Some(Command::Service {
+                command: ServiceCommand::Logs {
+                    lines: 20,
+                    follow: true,
+                }
+            })
+        ));
+    }
+
+    #[test]
+    fn unknown_subcommands_and_flags_are_rejected() {
+        assert!(Cli::try_parse_from(["zproxy", "restart"]).is_err());
+        assert!(Cli::try_parse_from(["zproxy", "logs", "--lines", "abc"]).is_err());
+        assert!(Cli::try_parse_from(["zproxy", "service"]).is_err());
+        assert!(Cli::try_parse_from(["zproxy", "service", "nope"]).is_err());
+    }
+}

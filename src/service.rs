@@ -498,7 +498,7 @@ fn run_cmd_stream(program: &str, args: &[String]) -> Result<()> {
     bail!("{} {:?} devolvió código {}", program, args, status)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 fn xml_escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -508,7 +508,83 @@ fn xml_escape(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 fn service_label() -> &'static str {
     "dev.zproxy"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::test_paths;
+
+    #[test]
+    fn xml_escape_replaces_every_reserved_character() {
+        assert_eq!(
+            xml_escape(r#"/a&b/<c>/"d"/'e'"#),
+            "/a&amp;b/&lt;c&gt;/&quot;d&quot;/&apos;e&apos;"
+        );
+        assert_eq!(xml_escape("/usr/local/bin/zproxy"), "/usr/local/bin/zproxy");
+    }
+
+    #[test]
+    fn the_service_label_is_stable() {
+        assert_eq!(service_label(), "dev.zproxy");
+    }
+
+    #[test]
+    fn is_installed_answers_without_failing() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = test_paths(dir.path());
+
+        // It inspects the real HOME, so only the absence of errors can be asserted.
+        assert!(is_installed(&paths).is_ok());
+    }
+
+    #[test]
+    fn tailing_a_missing_log_file_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("zproxy.log");
+
+        let error = tail_file(&missing, 10, false).unwrap_err();
+
+        assert!(error.to_string().contains("no existe el fichero de log"));
+    }
+
+    #[test]
+    fn tailing_an_existing_log_file_succeeds() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("zproxy.log");
+        fs::write(&log, "line one\nline two\n").unwrap();
+
+        assert!(tail_file(&log, 1, false).is_ok());
+    }
+
+    #[test]
+    fn run_cmd_reports_the_failing_command_output() {
+        assert!(run_cmd("true", &[]).is_ok());
+
+        let error = run_cmd("sh", &["-c", "echo out; echo err >&2; exit 3"]).unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains("devolvió error"));
+        assert!(message.contains("stdout='out'"));
+        assert!(message.contains("stderr='err'"));
+    }
+
+    #[test]
+    fn run_cmd_reports_missing_programs() {
+        let error = run_cmd("zproxy-does-not-exist", &[]).unwrap_err();
+
+        assert!(error.to_string().contains("falló al ejecutar"));
+    }
+
+    #[test]
+    fn run_cmd_stream_propagates_the_exit_code() {
+        assert!(run_cmd_stream("true", &[]).is_ok());
+
+        let error = run_cmd_stream("sh", &["-c".to_string(), "exit 4".to_string()]).unwrap_err();
+
+        assert!(error.to_string().contains("devolvió código"));
+    }
 }

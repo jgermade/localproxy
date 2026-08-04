@@ -1,2 +1,7 @@
 /target
 /.cargo-home
+/.tmp
+
+# LLVM coverage artefacts
+*.profraw
+*.profdata

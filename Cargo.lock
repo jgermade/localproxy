@@ -940,6 +940,7 @@ dependencies = [
  "libc",
  "pin-project-lite",
  "serde",
+ "tempfile",
  "tokio",
  "tokio-socks",
  "tokio-util",

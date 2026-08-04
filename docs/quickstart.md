@@ -1,12 +1,29 @@
 # Quickstart
 
-## Requirements
+## Install
+
+The fastest path is the prebuilt binary attached to the latest release:
+
+```bash
+# macOS (Apple Silicon)
+curl -fsSL -o ~/.local/bin/zproxy \
+  https://github.com/jgermade/zproxy/releases/latest/download/zproxy-macos-aarch64
+chmod +x ~/.local/bin/zproxy
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Other assets: `zproxy-macos-x86_64`, `zproxy-linux-x86_64`, `zproxy-linux-aarch64`. Full details
+(platform detection, Gatekeeper, upgrades, uninstall) in [installation.md](installation.md).
+
+## Build from source
+
+Only needed for development.
+
+### Requirements
 
 - A recent Rust toolchain with `cargo`.
 - macOS or Linux.
 - Internet access to download crates on the first build.
-
-## Build
 
 ```bash
 cargo build
@@ -123,6 +140,19 @@ HTTPS via CONNECT tunnel:
 curl -x http://127.0.0.1:8888 https://example.com
 ```
 
+## Use it from your shell
+
+Export the proxy variables so every tool picks zproxy up automatically:
+
+```bash
+export http_proxy="http://127.0.0.1:8888"
+export https_proxy="$http_proxy"
+export no_proxy="localhost,127.0.0.1,::1"
+```
+
+See [shell-integration.md](shell-integration.md) for persistent zsh/bash setup, toggle functions and
+tools that need their own proxy configuration.
+
 ## Query status
 
 ```bash
@@ -144,4 +174,5 @@ zproxy stop
 ## Notes
 
 - The first build requires internet access to fetch crates from crates.io.
-- There is no automatic integration with macOS Network Preferences or Linux desktop environments.
+- There is no automatic integration with macOS Network Preferences or Linux desktop environments;
+  use the environment variables described in [shell-integration.md](shell-integration.md).
