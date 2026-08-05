@@ -98,7 +98,10 @@ fn send_macos(summary: &str, body: &str) -> Result<()> {
         ));
     }
 
-    Err(anyhow!("osascript falló en todos los intentos: {}", errors.join(" | ")))
+    Err(anyhow!(
+        "osascript falló en todos los intentos: {}",
+        errors.join(" | ")
+    ))
 }
 
 #[cfg(target_os = "macos")]
