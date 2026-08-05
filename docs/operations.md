@@ -16,46 +16,20 @@ localproxy can run in two modes:
 
 These subcommands manage the user-level OS service (launchd on macOS, systemd on Linux).
 
-### Install
+| Command | Description |
+|---|---|
+| `localproxy service install` | Registers the service with launchd / systemd. |
+| `localproxy service start` | Starts the service. |
+| `localproxy service status` | Shows whether the service is installed and running. |
+| `localproxy service restart` | Stops and restarts the service. |
+| `localproxy service stop` | Stops the service. |
+| `localproxy service logs` | Tails the service logs (see [Logging](#logging) for options). |
+| `localproxy service uninstall` | Removes the service registration. |
 
-```bash
-localproxy service install
-```
-
-### Start
-
-```bash
-localproxy service start
-```
-
-### Status
-
-```bash
-localproxy service status
-```
-
-Example output:
+Example output of `localproxy service status`:
 
 ```text
 installed=true running=true state=running
-```
-
-### Restart
-
-```bash
-localproxy service restart
-```
-
-### Stop
-
-```bash
-localproxy service stop
-```
-
-### Uninstall
-
-```bash
-localproxy service uninstall
 ```
 
 ---

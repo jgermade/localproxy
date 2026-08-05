@@ -113,16 +113,21 @@ Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
 
 | Command | Description |
 |---|---|
-| `localproxy daemon` | Start the daemon and the proxy listener in the foreground. |
+| `localproxy run` | Start the daemon and the proxy listener in the foreground. |
 | `localproxy config` | Open the interactive wizard, save config and hot-reload the daemon. |
 | `localproxy status` | Query the running daemon via the Unix control socket. |
 | `localproxy reload` | Reload config from disk without restarting the process. |
 | `localproxy stop` | Stop the daemon. |
 | `localproxy start` | Start the service if installed; otherwise ask to run detached. |
-| `localproxy start --detached` | Start `localproxy daemon` in the background without registering a service. |
+| `localproxy start --detached` | Start `localproxy run` in the background without registering a service. |
 | `localproxy logs [--lines N] [--follow] [--detached]` | Show logs from the service or the detached log file. |
 | `localproxy paths` | Print config, state, socket and pid file paths. |
 | `localproxy url` | Print the proxy URL built from the listen address in `config.toml`. |
+
+## Service commands
+
+| Command | Description |
+|---|---|
 | `localproxy service install` | Register as a user-level service (LaunchAgent / systemd --user). |
 | `localproxy service start` | Start the registered service. |
 | `localproxy service restart` | Restart the registered service. |
@@ -150,7 +155,7 @@ cargo check
 cargo test
 cargo run -- paths
 cargo run -- config
-cargo run -- daemon
+cargo run -- run
 ```
 
 See [docs/testing.md](docs/testing.md) for the test layout and how to measure coverage.
