@@ -414,7 +414,7 @@ fn prompt_upstream(
             let protocol = prompt_protocol(theme, protocol_from_upstream(current))?;
             let port = Input::with_theme(theme)
                 .with_prompt("Gateway upstream port")
-                .default(port_from_upstream(current).unwrap_or(8080))
+                .default(port_from_upstream(current).unwrap_or(1234))
                 .interact_text()?;
             let poll_interval_secs = Input::with_theme(theme)
                 .with_prompt("Gateway poll interval (seconds)")
@@ -445,7 +445,7 @@ fn prompt_upstream(
                 .interact_text()?;
             let port = Input::with_theme(theme)
                 .with_prompt("Static upstream port")
-                .default(port_from_upstream(current).unwrap_or(8080))
+                .default(port_from_upstream(current).unwrap_or(1234))
                 .interact_text()?;
             Ok(UpstreamConfig::Static {
                 protocol,
@@ -499,7 +499,7 @@ fn prompt_fallback(
                 .interact_text()?;
             let port = Input::with_theme(theme)
                 .with_prompt("Fallback port")
-                .default(port_from_fallback(current).unwrap_or(8080))
+                .default(port_from_fallback(current).unwrap_or(1234))
                 .interact_text()?;
             Ok(FallbackConfig::Static {
                 protocol,
@@ -643,7 +643,7 @@ fn prompt_saved_proxy(theme: &ColorfulTheme, current: Option<&SavedProxy>) -> Re
         .interact_text()?;
     let port: u16 = Input::with_theme(theme)
         .with_prompt("Puerto")
-        .default(current.map(|proxy| proxy.port).unwrap_or(8080))
+        .default(current.map(|proxy| proxy.port).unwrap_or(1234))
         .interact_text()?;
     let connect_timeout_ms: u64 = Input::with_theme(theme)
         .with_prompt("Connect timeout (ms)")
@@ -867,10 +867,10 @@ mod tests {
             describe_fallback(&FallbackConfig::Static {
                 protocol: ProxyProtocol::Http,
                 host: "proxy".to_string(),
-                port: 8080,
+                port: 1234,
                 connect_timeout_ms: 3_000,
             }),
-            "static:http:proxy:8080"
+            "static:http:proxy:1234"
         );
     }
 
@@ -885,7 +885,7 @@ mod tests {
         let statik = UpstreamConfig::Static {
             protocol: ProxyProtocol::Http,
             host: "proxy".to_string(),
-            port: 8080,
+            port: 1234,
             connect_timeout_ms: 3_000,
         };
 
@@ -907,7 +907,7 @@ mod tests {
         let fallback_static = FallbackConfig::Static {
             protocol: ProxyProtocol::Socks5,
             host: "proxy".to_string(),
-            port: 8080,
+            port: 1234,
             connect_timeout_ms: 3_000,
         };
         assert!(matches!(
@@ -923,7 +923,7 @@ mod tests {
             Some("proxy")
         );
         assert!(host_from_fallback(&FallbackConfig::None).is_none());
-        assert_eq!(port_from_fallback(&fallback_static), Some(8080));
+        assert_eq!(port_from_fallback(&fallback_static), Some(1234));
         assert!(port_from_fallback(&FallbackConfig::Direct).is_none());
     }
 
@@ -949,7 +949,7 @@ mod tests {
             FallbackKind::of(&FallbackConfig::Static {
                 protocol: ProxyProtocol::Http,
                 host: "proxy".to_string(),
-                port: 8080,
+                port: 1234,
                 connect_timeout_ms: 3_000,
             }),
             FallbackKind::Static

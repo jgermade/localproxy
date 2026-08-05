@@ -48,16 +48,16 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 | 4 | `Nombre del proxy`, `Proxy protocol`, `Host`, `Puerto`, `Connect timeout (ms)` | text + list | adding or editing a saved proxy | current values |
 | 5 | `Upstream type` | list: `none` / `gateway` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
 | 6 | `Proxy protocol` | list: `http` / `socks5` | upstream is `gateway` or `static` | current protocol |
-| 7 | `Gateway upstream port` | text | upstream is `gateway` | current or `8080` |
+| 7 | `Gateway upstream port` | text | upstream is `gateway` | current or `1234` |
 | 8 | `Gateway poll interval (seconds)` | text | upstream is `gateway` | current or `5` |
 | 9 | `Upstream proxy` | list of saved proxies | upstream is `saved` | current selection |
 | 10 | `Static upstream host` | text | upstream is `static` | current or `127.0.0.1` |
-| 11 | `Static upstream port` | text | upstream is `static` | current or `8080` |
+| 11 | `Static upstream port` | text | upstream is `static` | current or `1234` |
 | 12 | `Fallback type` | list: `none` / `direct` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
 | 13 | `Proxy protocol` | list: `http` / `socks5` | fallback is `static` | current protocol |
 | 14 | `Fallback proxy` | list of saved proxies | fallback is `saved` | current selection |
 | 15 | `Fallback host` | text | fallback is `static` | current or `127.0.0.1` |
-| 16 | `Fallback port` | text | fallback is `static` | current or `8080` |
+| 16 | `Fallback port` | text | fallback is `static` | current or `1234` |
 | 17 | `Desktop notifications` | confirm: `y` / `n` | always | current value (`y`) |
 | 18 | `Notification icon path (empty = bundled logo)` | text | notifications are enabled | current value (empty) |
 
@@ -69,7 +69,7 @@ The `Proxies guardados` step is a menu that loops until you pick `continuar`:
 
 ```text
 ? Proxies guardados (edita, añade o continúa) ›
-  corp (http://proxy-a.internal:8080)
+  corp (http://proxy-a.internal:1234)
   tunnel (socks5://127.0.0.1:1080)
   + añadir proxy
   - eliminar proxy
@@ -148,13 +148,13 @@ $ localproxy config
 ✔ Listen port · 1234
 ✔ Upstream type · gateway
 ✔ Proxy protocol · http
-✔ Gateway upstream port · 8080
+✔ Gateway upstream port · 1234
 ✔ Gateway poll interval (seconds) · 5
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+reloaded: listen=127.0.0.1:1234 upstream=gateway:http:1234 fallback=direct gateway=192.168.1.1
 ```
 
-Note that the last line already shows the detected gateway (`192.168.1.1`), so the effective upstream is `192.168.1.1:8080`.
+Note that the last line already shows the detected gateway (`192.168.1.1`), so the effective upstream is `192.168.1.1:1234`.
 
 Resulting config:
 
@@ -166,7 +166,7 @@ port = 1234
 [upstream]
 type = "gateway"
 protocol = "http"
-port = 8080
+port = 1234
 poll_interval_secs = 5
 connect_timeout_ms = 3000
 
@@ -219,12 +219,12 @@ $ localproxy config
 ✔ Upstream type · static
 ✔ Proxy protocol · http
 ✔ Static upstream host · proxy-a.internal
-✔ Static upstream port · 8080
+✔ Static upstream port · 1234
 ✔ Fallback type · static
 ✔ Proxy protocol · http
 ✔ Fallback host · proxy-b.internal
-✔ Fallback port · 8080
-reloaded: listen=127.0.0.1:1234 upstream=static:http:proxy-a.internal:8080 fallback=static:http:proxy-b.internal:8080 gateway=unknown
+✔ Fallback port · 1234
+reloaded: listen=127.0.0.1:1234 upstream=static:http:proxy-a.internal:1234 fallback=static:http:proxy-b.internal:1234 gateway=unknown
 ```
 
 ### Example 5 — Running the wizard when the daemon is stopped
@@ -256,10 +256,10 @@ $ localproxy config
 ✔ Listen port · 9999
 ✔ Upstream type · gateway
 ✔ Proxy protocol · http
-✔ Gateway upstream port · 8080
+✔ Gateway upstream port · 1234
 ✔ Gateway poll interval (seconds) · 5
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:9999 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+reloaded: listen=127.0.0.1:9999 upstream=gateway:http:1234 fallback=direct gateway=192.168.1.1
 ```
 
 > The listen address is bound at startup. A `reload` does **not** move the listener to the new port; restart the daemon:
@@ -304,7 +304,7 @@ enabled = true
 name = "corp"
 protocol = "http"
 host = "proxy-a.internal"
-port = 8080
+port = 1234
 connect_timeout_ms = 3000
 ```
 
@@ -353,7 +353,7 @@ Optional list of saved proxies. Each entry is a named endpoint that `upstream` a
 name = "corp"
 protocol = "http"
 host = "proxy-a.internal"
-port = 8080
+port = 1234
 connect_timeout_ms = 3000
 
 [[proxy]]
@@ -394,7 +394,7 @@ Builds the upstream address as `<default_gateway_ip>:<port>`. The daemon re-dete
 [upstream]
 type = "gateway"
 protocol = "http"
-port = 8080
+port = 1234
 poll_interval_secs = 5
 connect_timeout_ms = 3000
 ```
@@ -485,7 +485,7 @@ If the upstream fails, localproxy tries a second fixed proxy.
 type = "static"
 protocol = "http"
 host = "10.0.0.20"
-port = 8080
+port = 1234
 connect_timeout_ms = 3000
 ```
 
@@ -526,7 +526,7 @@ port = 1234
 [upstream]
 type = "gateway"
 protocol = "http"
-port = 8080
+port = 1234
 poll_interval_secs = 5
 connect_timeout_ms = 3000
 
@@ -552,7 +552,7 @@ connect_timeout_ms = 3000
 type = "static"
 protocol = "http"
 host = "10.10.10.10"
-port = 8080
+port = 1234
 connect_timeout_ms = 3000
 ```
 

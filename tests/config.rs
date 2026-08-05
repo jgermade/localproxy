@@ -85,10 +85,10 @@ fn the_proxy_url_follows_the_listen_address() {
     assert_eq!(
         ListenConfig {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
-            port: 8080,
+            port: 1234,
         }
         .proxy_url(),
-        "http://10.0.0.5:8080"
+        "http://10.0.0.5:1234"
     );
     assert_eq!(
         ListenConfig {
@@ -145,7 +145,7 @@ fn toml_roundtrip_preserves_every_section() {
         fallback: FallbackConfig::Static {
             protocol: ProxyProtocol::Http,
             host: "proxy.example.com".to_string(),
-            port: 8080,
+            port: 1234,
             connect_timeout_ms: 400,
         },
         notifications: NotificationsConfig {
@@ -173,7 +173,7 @@ fn toml_roundtrip_preserves_every_section() {
         FallbackConfig::Static {
             protocol: ProxyProtocol::Http,
             host,
-            port: 8080,
+            port: 1234,
             connect_timeout_ms: 400,
         } if host == "proxy.example.com"
     ));
@@ -199,7 +199,7 @@ fn optional_fields_use_defaults_when_missing() {
     let raw = r#"
         [upstream]
         type = "gateway"
-        port = 8080
+        port = 1234
 
         [[proxy]]
         name = "corp"
@@ -336,7 +336,7 @@ fn gateway_upstream_needs_a_detected_gateway() {
     let config = AppConfig {
         upstream: UpstreamConfig::Gateway {
             protocol: ProxyProtocol::Http,
-            port: 8080,
+            port: 1234,
             poll_interval_secs: 5,
             connect_timeout_ms: 3_000,
         },
@@ -348,7 +348,7 @@ fn gateway_upstream_needs_a_detected_gateway() {
     let gateway = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
     let endpoint = resolve_upstream_endpoint(&config, Some(gateway)).unwrap();
 
-    assert_eq!(endpoint.address(), "192.168.1.1:8080");
+    assert_eq!(endpoint.address(), "192.168.1.1:1234");
     assert!(matches!(endpoint.protocol, ProxyProtocol::Http));
 }
 
@@ -427,14 +427,14 @@ fn saved_and_static_fallbacks_resolve_to_endpoints() {
         fallback: FallbackConfig::Static {
             protocol: ProxyProtocol::Http,
             host: "proxy".to_string(),
-            port: 8080,
+            port: 1234,
             connect_timeout_ms: 50,
         },
         ..AppConfig::default()
     };
     assert_eq!(
         resolve_fallback_endpoint(&statik).unwrap().address(),
-        "proxy:8080"
+        "proxy:1234"
     );
 }
 
@@ -444,7 +444,7 @@ fn gateway_poll_interval_defaults_outside_gateway_mode() {
     assert_eq!(
         gateway_poll_interval_secs(&UpstreamConfig::Gateway {
             protocol: ProxyProtocol::Http,
-            port: 8080,
+            port: 1234,
             poll_interval_secs: 42,
             connect_timeout_ms: 3_000,
         }),
@@ -466,7 +466,7 @@ fn summarize_renders_every_field() {
     let config = AppConfig {
         upstream: UpstreamConfig::Gateway {
             protocol: ProxyProtocol::Http,
-            port: 8080,
+            port: 1234,
             poll_interval_secs: 5,
             connect_timeout_ms: 3_000,
         },
@@ -475,7 +475,7 @@ fn summarize_renders_every_field() {
 
     assert_eq!(
         summarize(&config, Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)))),
-        "listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1"
+        "listen=127.0.0.1:1234 upstream=gateway:http:1234 fallback=direct gateway=192.168.1.1"
     );
     assert!(summarize(&config, None).ends_with("gateway=unknown"));
 }

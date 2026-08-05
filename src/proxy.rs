@@ -610,10 +610,10 @@ mod tests {
             "example.com:443"
         );
         assert_eq!(
-            extract_destination(&request("GET", "http://example.com:8080/", &[]))
+            extract_destination(&request("GET", "http://example.com:1234/", &[]))
                 .unwrap()
                 .authority,
-            "example.com:8080"
+            "example.com:1234"
         );
     }
 
@@ -635,8 +635,8 @@ mod tests {
         assert_eq!(destination.path, "/a");
 
         let explicit =
-            extract_destination(&request("GET", "/a", &[("host", "example.com:8080")])).unwrap();
-        assert_eq!(explicit.authority, "example.com:8080");
+            extract_destination(&request("GET", "/a", &[("host", "example.com:1234")])).unwrap();
+        assert_eq!(explicit.authority, "example.com:1234");
     }
 
     #[test]
@@ -702,7 +702,7 @@ mod tests {
         let config = AppConfig {
             upstream: UpstreamConfig::Gateway {
                 protocol: ProxyProtocol::Http,
-                port: 8080,
+                port: 1234,
                 poll_interval_secs: 5,
                 connect_timeout_ms: 3_000,
             },
@@ -722,7 +722,7 @@ mod tests {
             resolve_routes_from_config(&config, Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))));
         assert_eq!(
             with_gateway.iter().map(describe_route).collect::<Vec<_>>(),
-            vec!["http://192.168.1.1:8080", "direct"]
+            vec!["http://192.168.1.1:1234", "direct"]
         );
     }
 
@@ -791,11 +791,11 @@ mod tests {
     #[test]
     fn connect_timeouts_are_never_zero() {
         assert_eq!(
-            timeout_for(&endpoint(ProxyProtocol::Http, "127.0.0.1", 8080)),
+            timeout_for(&endpoint(ProxyProtocol::Http, "127.0.0.1", 1234)),
             Duration::from_millis(3_000)
         );
 
-        let mut instant = endpoint(ProxyProtocol::Http, "127.0.0.1", 8080);
+        let mut instant = endpoint(ProxyProtocol::Http, "127.0.0.1", 1234);
         instant.connect_timeout_ms = 0;
         assert_eq!(timeout_for(&instant), Duration::from_millis(1));
     }

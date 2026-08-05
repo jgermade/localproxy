@@ -103,10 +103,10 @@ $ localproxy config
 ✔ Listen port · 1234
 ✔ Upstream type · gateway
 ✔ Proxy protocol · http
-✔ Gateway upstream port · 8080
+✔ Gateway upstream port · 1234
 ✔ Gateway poll interval (seconds) · 5
 ✔ Fallback type · direct
-reloaded: listen=127.0.0.1:1234 upstream=gateway:http:8080 fallback=direct gateway=192.168.1.1
+reloaded: listen=127.0.0.1:1234 upstream=gateway:http:1234 fallback=direct gateway=192.168.1.1
 ```
 
 **Static SOCKS5 upstream** (fixed upstream proxy, no fallback):

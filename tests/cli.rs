@@ -179,7 +179,7 @@ async fn config_extend_adds_missing_fields_without_overwriting_existing_values()
 
         [upstream]
         type = "gateway"
-        port = 8080
+        port = 1234
 
         [[proxy]]
         name = "corp"
@@ -209,7 +209,7 @@ async fn config_extend_adds_missing_fields_without_overwriting_existing_values()
         config.upstream,
         UpstreamConfig::Gateway {
             protocol: ProxyProtocol::Http,
-            port: 8080,
+            port: 1234,
             poll_interval_secs: 5,
             connect_timeout_ms: 3_000,
         }

@@ -54,13 +54,13 @@ port = 1234
 
 [upstream]
 type = "gateway"          # "gateway" | "static" | "none"
-port = 8080
+port = 1234
 poll_interval_secs = 5    # only applies when type = "gateway"
 
 [fallback]
 type = "static"           # "static" | "direct" | "none"
 host = "1.2.3.4"
-port = 8080
+port = 1234
 ```
 
 Connection logic:
