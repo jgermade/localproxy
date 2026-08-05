@@ -68,25 +68,37 @@ fn send(icon: Option<PathBuf>, summary: &str, body: &str) {
 
 #[cfg(target_os = "macos")]
 fn send_macos(summary: &str, body: &str) -> Result<()> {
-    let script = format!(
-        "display notification {} with title {}",
-        applescript_string(body),
-        applescript_string(summary)
-    );
+    let scripts = [
+        format!(
+            "display notification {} with title {}",
+            applescript_string(body),
+            applescript_string(summary)
+        ),
+        format!(
+            "tell application \"Finder\" to display notification {} with title {}",
+            applescript_string(body),
+            applescript_string(summary)
+        ),
+    ];
 
-    let output = std::process::Command::new("osascript")
-        .args(["-e", &script])
-        .output()?;
+    let mut errors = Vec::new();
+    for script in scripts {
+        let output = std::process::Command::new("/usr/bin/osascript")
+            .args(["-e", &script])
+            .output()?;
 
-    if output.status.success() {
-        return Ok(());
+        if output.status.success() {
+            return Ok(());
+        }
+
+        errors.push(format!(
+            "{}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
 
-    Err(anyhow!(
-        "osascript devolvió {}: {}",
-        output.status,
-        String::from_utf8_lossy(&output.stderr).trim()
-    ))
+    Err(anyhow!("osascript falló en todos los intentos: {}", errors.join(" | ")))
 }
 
 #[cfg(target_os = "macos")]
