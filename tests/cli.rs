@@ -3,8 +3,8 @@
 use std::fs;
 
 use clap::Parser;
-use localproxy::config::{AppConfig, ProxyProtocol, UpstreamConfig};
 use localproxy::cli::{Cli, Command, ServiceCommand};
+use localproxy::config::{AppConfig, ProxyProtocol, UpstreamConfig};
 
 #[test]
 fn no_subcommand_means_daemon_mode() {
