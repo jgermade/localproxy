@@ -12,6 +12,8 @@ Each release publishes one static asset per platform:
 | `localproxy-macos-aarch64` | macOS on Apple Silicon (M1/M2/M3/M4) |
 | `localproxy-macos-x86_64` | macOS on Intel |
 | `localproxy-linux-x86_64` | Linux on x86_64 |
+| `localproxy-linux-i686` | Linux on 32-bit x86 |
+| `localproxy-linux-armv7` | Linux on 32-bit ARM hard-float |
 | `localproxy-linux-aarch64` | Linux on arm64 |
 
 They are plain executables — no archive, no installer. Releases live at

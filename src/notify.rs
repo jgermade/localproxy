@@ -52,17 +52,17 @@ fn send(icon: Option<PathBuf>, summary: &str, body: &str) {
 
     #[cfg(not(target_os = "macos"))]
     {
-    let mut notification = notify_rust::Notification::new();
-    notification.appname(APP_NAME).summary(summary).body(body);
+        let mut notification = notify_rust::Notification::new();
+        notification.appname(APP_NAME).summary(summary).body(body);
 
-    if let Some(icon) = icon.as_ref().map(|path| path.to_string_lossy().to_string()) {
-        notification.image_path(&icon);
-        notification.icon(&icon);
-    }
+        if let Some(icon) = icon.as_ref().map(|path| path.to_string_lossy().to_string()) {
+            notification.image_path(&icon);
+            notification.icon(&icon);
+        }
 
-    if let Err(error) = notification.show() {
-        debug!(%error, "no se pudo enviar la notificación de escritorio");
-    }
+        if let Err(error) = notification.show() {
+            debug!(%error, "no se pudo enviar la notificación de escritorio");
+        }
     }
 }
 
@@ -142,6 +142,9 @@ mod tests {
 
     #[test]
     fn applescript_strings_flatten_newlines() {
-        assert_eq!(applescript_string("linea 1\nlinea 2"), "\"linea 1 linea 2\"");
+        assert_eq!(
+            applescript_string("linea 1\nlinea 2"),
+            "\"linea 1 linea 2\""
+        );
     }
 }

@@ -53,7 +53,7 @@ chmod +x ~/.local/bin/localproxy
 ```
 
 Available assets: `localproxy-macos-aarch64`, `localproxy-macos-x86_64`, `localproxy-linux-x86_64`,
-`localproxy-linux-aarch64`. See [docs/installation.md](docs/installation.md) for platform detection,
+`localproxy-linux-aarch64`, `localproxy-linux-i686`, `localproxy-linux-armv7`. See [docs/installation.md](docs/installation.md) for platform detection,
 Gatekeeper notes, upgrades and uninstall.
 
 ## Shell setup (zsh / bash)
@@ -171,7 +171,7 @@ CARGO_HOME=$PWD/.cargo-home cargo check
 `build.yml` runs fmt, clippy, `cargo test` and a coverage gate (`scripts/coverage.sh --fail-under 60`)
 before building the binaries.
 
-`release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries atta[...]
+`release.yml` bumps the version in `Cargo.toml`, commits, tags, builds cross-platform binaries (Linux x86_64/i686/armv7/aarch64, macOS x86_64/aarch64) and publishes a GitHub Release with those binaries atta[...]
 
 ## License
 

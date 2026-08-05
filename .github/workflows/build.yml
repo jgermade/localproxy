@@ -109,6 +109,14 @@ jobs:
             os: ubuntu-latest
             artifact: localproxy-linux-aarch64
             cross: true
+          - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: localproxy-linux-i686
+            cross: true
+          - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            artifact: localproxy-linux-armv7
+            cross: true
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: localproxy-macos-x86_64
