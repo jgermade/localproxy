@@ -6,7 +6,9 @@
 
 use std::{fs, path::PathBuf, sync::OnceLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+#[cfg(target_os = "macos")]
+use anyhow::anyhow;
 use tracing::debug;
 
 use crate::config::{AppPaths, NotificationsConfig};
