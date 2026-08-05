@@ -213,6 +213,17 @@ tmp_file=""
 
 log "Installed $("$install_dir/localproxy" --version) -> $install_dir/localproxy"
 
+# If there is a config from a previous install, rewrite it with defaults from
+# the current binary so missing fields introduced in new versions are added.
+config_file="$HOME/.config/localproxy/config.toml"
+if [ -f "$config_file" ]; then
+  if "$install_dir/localproxy" config-extend > /dev/null 2>&1; then
+    log "Extended existing config with missing fields: $config_file"
+  else
+    warn "could not extend existing config: $config_file"
+  fi
+fi
+
 # --- shell profile ---------------------------------------------------------
 
 detect_profile() {

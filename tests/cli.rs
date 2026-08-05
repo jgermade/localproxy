@@ -1,6 +1,9 @@
 //! CLI surface: argument parsing and subcommand defaults.
 
+use std::fs;
+
 use clap::Parser;
+use localproxy::config::{AppConfig, ProxyProtocol, UpstreamConfig};
 use localproxy::cli::{Cli, Command, ServiceCommand};
 
 #[test]
@@ -15,6 +18,7 @@ fn every_top_level_subcommand_is_accepted() {
     for (args, expected) in [
         (vec!["localproxy", "daemon"], "Daemon"),
         (vec!["localproxy", "config"], "Config"),
+        (vec!["localproxy", "config-extend"], "ConfigExtend"),
         (vec!["localproxy", "status"], "Status"),
         (vec!["localproxy", "stop"], "Stop"),
         (vec!["localproxy", "reload"], "Reload"),
@@ -161,4 +165,53 @@ async fn detached_logs_read_the_state_log_file() {
     )
     .await
     .unwrap();
+}
+
+#[tokio::test]
+async fn config_extend_adds_missing_fields_without_overwriting_existing_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = localproxy::testing::paths(dir.path());
+    paths.ensure_dirs().unwrap();
+
+    let old_config = r#"
+        [listen]
+        port = 4321
+
+        [upstream]
+        type = "gateway"
+        port = 8080
+
+        [[proxy]]
+        name = "corp"
+        host = "10.0.0.1"
+        port = 3128
+    "#;
+    fs::write(&paths.config_file, old_config).unwrap();
+
+    localproxy::cli::dispatch(Command::ConfigExtend, paths.clone())
+        .await
+        .unwrap();
+
+    let raw = fs::read_to_string(&paths.config_file).unwrap();
+    assert!(raw.contains("[notifications]"));
+
+    let config: AppConfig = toml::from_str(&raw).unwrap();
+
+    // Existing values are preserved.
+    assert_eq!(config.listen.port, 4321);
+    assert_eq!(config.proxies[0].name, "corp");
+
+    // Missing values are added from defaults.
+    assert!(config.notifications.enabled);
+    assert!(matches!(config.proxies[0].protocol, ProxyProtocol::Http));
+    assert_eq!(config.proxies[0].connect_timeout_ms, 3_000);
+    assert!(matches!(
+        config.upstream,
+        UpstreamConfig::Gateway {
+            protocol: ProxyProtocol::Http,
+            port: 8080,
+            poll_interval_secs: 5,
+            connect_timeout_ms: 3_000,
+        }
+    ));
 }

@@ -27,6 +27,8 @@ pub struct Cli {
 pub enum Command {
     Daemon,
     Config,
+    /// Extiende config.toml con campos nuevos que falten (sin asistente interactivo).
+    ConfigExtend,
     Status,
     Stop,
     Reload,
@@ -85,6 +87,7 @@ pub async fn dispatch(command: Command, paths: config::AppPaths) -> Result<()> {
     match command {
         Command::Daemon => app::run_daemon(paths).await,
         Command::Config => run_config(paths).await,
+        Command::ConfigExtend => run_config_extend(paths),
         Command::Status => {
             run_control(paths.control_socket(), control::ControlCommand::Status).await
         }
@@ -245,6 +248,13 @@ async fn run_config(paths: config::AppPaths) -> Result<()> {
         Err(error) => println!("config saved; daemon not notified: {error}"),
     }
 
+    Ok(())
+}
+
+fn run_config_extend(paths: config::AppPaths) -> Result<()> {
+    let current = config::load_or_create(&paths)?;
+    config::save(&paths, &current)?;
+    println!("config actualizada: {}", paths.config_file.display());
     Ok(())
 }
 
