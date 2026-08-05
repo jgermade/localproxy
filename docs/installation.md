@@ -23,7 +23,7 @@ Identify your platform if you are unsure:
 
 ```bash
 uname -s        # Darwin | Linux
-uname -m        # arm64 / aarch64 | x86_64
+uname -m        # arm64 / aarch64 | x86_64 | i686 / i386 | armv7l
 ```
 
 ## One-line install
@@ -85,6 +85,8 @@ esac
 case "$arch" in
   arm64|aarch64) arch_tag=aarch64 ;;
   x86_64|amd64)  arch_tag=x86_64 ;;
+  i386|i486|i586|i686) arch_tag=i686 ;;
+  armv7|armv7l|armv7hl) arch_tag=armv7 ;;
   *) echo "unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 

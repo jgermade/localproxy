@@ -93,9 +93,13 @@ detect_asset() {
   *) die "unsupported operating system: $os (only macOS and Linux have release binaries)" ;;
   esac
 
-  case "$arch" in
-  x86_64 | amd64) arch_name="x86_64" ;;
-  arm64 | aarch64) arch_name="aarch64" ;;
+  case "$os_name:$arch" in
+  macos:x86_64 | macos:amd64) arch_name="x86_64" ;;
+  macos:arm64 | macos:aarch64) arch_name="aarch64" ;;
+  linux:x86_64 | linux:amd64) arch_name="x86_64" ;;
+  linux:arm64 | linux:aarch64) arch_name="aarch64" ;;
+  linux:i386 | linux:i486 | linux:i586 | linux:i686) arch_name="i686" ;;
+  linux:armv7 | linux:armv7l | linux:armv7hl) arch_name="armv7" ;;
   *) die "unsupported architecture: $arch" ;;
   esac
 
