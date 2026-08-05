@@ -189,7 +189,7 @@ fn install_macos(paths: &config::AppPaths) -> Result<()> {
     <key>ProgramArguments</key>
     <array>
       <string>{exe}</string>
-      <string>daemon</string>
+            <string>run</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -374,7 +374,7 @@ fn install_linux(paths: &config::AppPaths) -> Result<()> {
     }
 
     let unit = format!(
-        "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} daemon\nWorkingDirectory={}\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+        "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} run\nWorkingDirectory={}\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         exe.display(),
         home.display(),
     );

@@ -138,7 +138,7 @@ pub fn start_detached(paths: &config::AppPaths) -> Result<u32> {
 
     let mut command = Command::new(exe);
     command
-        .arg("daemon")
+        .arg("run")
         .stdin(Stdio::null())
         .stdout(Stdio::from(log_file))
         .stderr(Stdio::from(err_file));
