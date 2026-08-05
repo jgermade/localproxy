@@ -1,10 +1,15 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::Confirm;
 
 use crate::{app, config, control, service};
+
+const BLOCK_BEGIN: &str =
+    "# --- localproxy -----------------------------------------------------------";
+const BLOCK_END: &str =
+    "# --- end localproxy -------------------------------------------------------";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -44,6 +49,12 @@ pub enum Command {
     Paths,
     /// Prints the proxy URL built from the listen address in config.toml.
     Url,
+    /// Elimina el binario, la configuración y el snippet de shell.
+    /// Pasa --confirm para omitir la confirmación interactiva.
+    Purge {
+        #[arg(long)]
+        confirm: bool,
+    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -96,7 +107,125 @@ pub async fn dispatch(command: Command, paths: config::AppPaths) -> Result<()> {
             println!("{}", config::load_or_create(&paths)?.listen.proxy_url());
             Ok(())
         }
+        Command::Purge { confirm } => run_purge(paths, confirm).await,
     }
+}
+
+async fn run_purge(paths: config::AppPaths, confirm: bool) -> Result<()> {
+    let home = dirs::home_dir().context("no se pudo resolver HOME")?;
+    let exe = std::env::current_exe().context("no se pudo resolver la ruta del ejecutable")?;
+
+    let profiles: Vec<PathBuf> = [
+        home.join(".zshrc"),
+        home.join(".bashrc"),
+        home.join(".bash_profile"),
+    ]
+    .into_iter()
+    .filter(|p| p.exists())
+    .collect();
+
+    println!("Se eliminarán los siguientes elementos:");
+    println!("  binario:       {}", exe.display());
+    println!("  configuración: {}", paths.config_dir.display());
+    println!("  estado:        {}", paths.state_dir.display());
+    for p in &profiles {
+        println!("  snippet en:    {}", p.display());
+    }
+
+    let proceed = if confirm {
+        true
+    } else {
+        Confirm::new()
+            .with_prompt("¿Continuar? Esta operación no se puede deshacer")
+            .default(false)
+            .interact()?
+    };
+
+    if !proceed {
+        println!("cancelado");
+        return Ok(());
+    }
+
+    // Detener el daemon (best effort)
+    let _ = control::send_command(paths.control_socket(), control::ControlCommand::Stop).await;
+
+    // Desinstalar el servicio si está instalado (best effort)
+    let _ = service::uninstall(&paths);
+
+    // Eliminar directorio de configuración
+    if paths.config_dir.exists() {
+        fs::remove_dir_all(&paths.config_dir)
+            .with_context(|| format!("no se pudo borrar {}", paths.config_dir.display()))?;
+        println!("eliminado: {}", paths.config_dir.display());
+    }
+
+    // Eliminar directorio de estado
+    if paths.state_dir.exists() {
+        fs::remove_dir_all(&paths.state_dir)
+            .with_context(|| format!("no se pudo borrar {}", paths.state_dir.display()))?;
+        println!("eliminado: {}", paths.state_dir.display());
+    }
+
+    // Eliminar snippets de shell
+    for p in &profiles {
+        match strip_shell_block(p) {
+            Ok(true) => println!("snippet eliminado de: {}", p.display()),
+            Ok(false) => {}
+            Err(e) => eprintln!("advertencia: no se pudo actualizar {}: {}", p.display(), e),
+        }
+    }
+
+    // Eliminar el binario (al final, pues lo estamos ejecutando)
+    if exe.exists() {
+        fs::remove_file(&exe)
+            .with_context(|| format!("no se pudo borrar el binario {}", exe.display()))?;
+        println!("eliminado: {}", exe.display());
+    }
+
+    println!("purge completado");
+    Ok(())
+}
+
+/// Elimina el bloque delimitado por BLOCK_BEGIN / BLOCK_END del fichero dado.
+/// Devuelve true si se encontró y eliminó el bloque, false si no existía.
+fn strip_shell_block(path: &PathBuf) -> Result<bool> {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("no se pudo leer {}", path.display()))?;
+    let lines: Vec<&str> = content.lines().collect();
+
+    let Some(begin) = lines.iter().position(|l| *l == BLOCK_BEGIN) else {
+        return Ok(false);
+    };
+    let end = lines[begin..]
+        .iter()
+        .position(|l| *l == BLOCK_END)
+        .map(|i| begin + i)
+        .unwrap_or(lines.len().saturating_sub(1));
+
+    // Incluir la línea en blanco inmediatamente anterior al bloque si existe
+    let start = if begin > 0 && lines[begin - 1].trim().is_empty() {
+        begin - 1
+    } else {
+        begin
+    };
+
+    let mut new_lines: Vec<&str> = lines[..start].to_vec();
+    new_lines.extend_from_slice(&lines[end + 1..]);
+
+    // Eliminar líneas en blanco al final
+    while new_lines.last().is_some_and(|l| l.trim().is_empty()) {
+        new_lines.pop();
+    }
+
+    let new_content = if new_lines.is_empty() {
+        String::new()
+    } else {
+        new_lines.join("\n") + "\n"
+    };
+
+    fs::write(path, new_content)
+        .with_context(|| format!("no se pudo escribir {}", path.display()))?;
+    Ok(true)
 }
 
 pub fn print_paths(paths: &config::AppPaths) {

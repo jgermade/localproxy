@@ -273,6 +273,36 @@ LOCALPROXY_BLOCK
   } >> "$target"
 }
 
+update_block() {
+  target="$1"
+  tmp="$(mktemp "${TMPDIR:-/tmp}/localproxy-profile.XXXXXX")"
+
+  if ! awk -v begin="$BLOCK_BEGIN" -v end="$BLOCK_END" '
+    $0 == begin { in_block = 1; replaced = 1; next }
+    in_block {
+      if ($0 == end) {
+        in_block = 0
+      }
+      next
+    }
+    { print }
+    END {
+      if (in_block) {
+        exit 2
+      }
+      if (!replaced) {
+        exit 3
+      }
+    }
+  ' "$target" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+
+  mv "$tmp" "$target"
+  write_block "$target"
+}
+
 profile_updated=0
 
 if [ "$modify_profile" -eq 1 ]; then
@@ -285,7 +315,12 @@ if [ "$modify_profile" -eq 1 ]; then
     if [ ! -w "$profile" ]; then
       warn "cannot write $profile; skipping profile setup"
     elif grep -qF "$BLOCK_BEGIN" "$profile" 2> /dev/null; then
-      log "localproxy block already present in $profile; leaving it untouched"
+      if update_block "$profile"; then
+        profile_updated=1
+        log "Updated the localproxy block in $profile"
+      else
+        warn "found a localproxy block in $profile but failed to update it"
+      fi
     else
       write_block "$profile"
       profile_updated=1
