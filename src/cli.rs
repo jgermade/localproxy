@@ -189,8 +189,8 @@ async fn run_purge(paths: config::AppPaths, confirm: bool) -> Result<()> {
 /// Elimina el bloque delimitado por BLOCK_BEGIN / BLOCK_END del fichero dado.
 /// Devuelve true si se encontró y eliminó el bloque, false si no existía.
 fn strip_shell_block(path: &PathBuf) -> Result<bool> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("no se pudo leer {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("no se pudo leer {}", path.display()))?;
     let lines: Vec<&str> = content.lines().collect();
 
     let Some(begin) = lines.iter().position(|l| *l == BLOCK_BEGIN) else {
