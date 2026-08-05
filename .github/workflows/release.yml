@@ -91,6 +91,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/
+          pattern: localproxy-*
 
       - name: Generate release notes
         id: notes
