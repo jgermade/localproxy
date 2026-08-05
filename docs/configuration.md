@@ -334,7 +334,7 @@ The icon is optional: when it is not set, localproxy uses the logo bundled in th
 
 > Notifications are best effort: if the desktop notification service is unavailable the failure is only logged at debug level and the proxy keeps running. No administrator privileges are required, but macOS asks the user to allow notifications the first time one is posted.
 >
-> On macOS the image is rendered inside the banner. The small app icon and the app name on its left belong to the process that posts the notification, and changing those requires shipping localproxy inside a signed `.app` bundle.
+> On macOS 26 and later, localproxy posts notifications through `osascript` because the legacy `NSUserNotificationCenter` backend used by `notify-rust` is deprecated and unreliable there. That compatibility path does not support a custom notification image; the small app icon and the app name on the left belong to the process that posts the notification, and changing those requires shipping localproxy inside a signed `.app` bundle.
 
 ## [[proxy]]
 

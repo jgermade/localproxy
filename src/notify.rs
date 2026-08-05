@@ -6,11 +6,12 @@
 
 use std::{fs, path::PathBuf, sync::OnceLock};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use tracing::debug;
 
 use crate::config::{AppPaths, NotificationsConfig};
 
+#[cfg(not(target_os = "macos"))]
 const APP_NAME: &str = "localproxy";
 
 /// Logo cropped from `localproxy-logo.svg`, shipped inside the binary.
@@ -38,19 +39,64 @@ pub fn notify(config: &NotificationsConfig, summary: &str, body: &str) {
 }
 
 fn send(icon: Option<PathBuf>, summary: &str, body: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = icon;
+
+        if let Err(error) = send_macos(summary, body) {
+            debug!(%error, "no se pudo enviar la notificación de escritorio");
+        }
+
+        return;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
     let mut notification = notify_rust::Notification::new();
     notification.appname(APP_NAME).summary(summary).body(body);
 
     if let Some(icon) = icon.as_ref().map(|path| path.to_string_lossy().to_string()) {
-        // macOS renders it beside the banner text; XDG servers take it as the image hint.
         notification.image_path(&icon);
-        #[cfg(not(target_os = "macos"))]
         notification.icon(&icon);
     }
 
     if let Err(error) = notification.show() {
         debug!(%error, "no se pudo enviar la notificación de escritorio");
     }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn send_macos(summary: &str, body: &str) -> Result<()> {
+    let script = format!(
+        "display notification {} with title {}",
+        applescript_string(body),
+        applescript_string(summary)
+    );
+
+    let output = std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .output()?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    Err(anyhow!(
+        "osascript devolvió {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
+}
+
+#[cfg(target_os = "macos")]
+fn applescript_string(value: &str) -> String {
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', " ");
+
+    format!("\"{escaped}\"")
 }
 
 fn icon_path(config: &NotificationsConfig) -> Option<PathBuf> {
@@ -80,4 +126,22 @@ fn write_bundled_icon() -> Result<PathBuf> {
     let path = paths.state_dir.join("localproxy-icon.png");
     fs::write(&path, BUNDLED_ICON)?;
     Ok(path)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::applescript_string;
+
+    #[test]
+    fn applescript_strings_escape_quotes_and_backslashes() {
+        assert_eq!(
+            applescript_string("ruta \\\"tmp\\\""),
+            "\"ruta \\\\\\\"tmp\\\\\\\"\""
+        );
+    }
+
+    #[test]
+    fn applescript_strings_flatten_newlines() {
+        assert_eq!(applescript_string("linea 1\nlinea 2"), "\"linea 1 linea 2\"");
+    }
 }
