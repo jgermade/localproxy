@@ -274,14 +274,17 @@ if command -v localproxy > /dev/null 2>&1; then
   # daemon is really listening. Start it in the background otherwise.
   localproxy status > /dev/null 2>&1 || localproxy start --detached > /dev/null 2>&1
 
-  export http_proxy="$LOCALPROXY_URL"
-  export https_proxy="$LOCALPROXY_URL"
-  export all_proxy="$LOCALPROXY_URL"
-  export HTTP_PROXY="$LOCALPROXY_URL"
-  export HTTPS_PROXY="$LOCALPROXY_URL"
-  export ALL_PROXY="$LOCALPROXY_URL"
-  export no_proxy="$LOCALPROXY_NO_PROXY"
-  export NO_PROXY="$LOCALPROXY_NO_PROXY"
+  # Only export proxy variables if the daemon is confirmed to be running.
+  if localproxy status > /dev/null 2>&1; then
+    export http_proxy="$LOCALPROXY_URL"
+    export https_proxy="$LOCALPROXY_URL"
+    export all_proxy="$LOCALPROXY_URL"
+    export HTTP_PROXY="$LOCALPROXY_URL"
+    export HTTPS_PROXY="$LOCALPROXY_URL"
+    export ALL_PROXY="$LOCALPROXY_URL"
+    export no_proxy="$LOCALPROXY_NO_PROXY"
+    export NO_PROXY="$LOCALPROXY_NO_PROXY"
+  fi
 fi
 LOCALPROXY_BLOCK
     printf '%s\n' "$BLOCK_END"
