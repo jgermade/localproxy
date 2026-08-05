@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use dialoguer::Confirm;
 
 use crate::{app, config, control, service};
@@ -25,7 +25,8 @@ pub struct Cli {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
-    Daemon,
+    /// Runs the proxy in the foreground (useful for development and debugging).
+    Run,
     Config,
     /// Extiende config.toml con campos nuevos que falten (sin asistente interactivo).
     ConfigExtend,
@@ -79,13 +80,19 @@ pub enum ServiceCommand {
 pub async fn run() -> Result<()> {
     let cli = Cli::parse();
     let paths = config::AppPaths::discover()?;
-    dispatch(cli.command.unwrap_or(Command::Daemon), paths).await
+    match cli.command {
+        Some(command) => dispatch(command, paths).await,
+        None => {
+            Cli::command().print_help()?;
+            Ok(())
+        }
+    }
 }
 
 /// Runs a single command against the given paths.
 pub async fn dispatch(command: Command, paths: config::AppPaths) -> Result<()> {
     match command {
-        Command::Daemon => app::run_daemon(paths).await,
+        Command::Run => app::run_daemon(paths).await,
         Command::Config => run_config(paths).await,
         Command::ConfigExtend => run_config_extend(paths),
         Command::Status => {

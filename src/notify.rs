@@ -46,8 +46,6 @@ fn send(icon: Option<PathBuf>, summary: &str, body: &str) {
         if let Err(error) = send_macos(summary, body) {
             debug!(%error, "no se pudo enviar la notificación de escritorio");
         }
-
-        return;
     }
 
     #[cfg(not(target_os = "macos"))]

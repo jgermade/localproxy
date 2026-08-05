@@ -131,7 +131,7 @@ Recommended for daily use (registers a user-level service):
 
 ```bash
 localproxy service install
-localproxy start
+localproxy service start
 ```
 
 Without registering a service:
@@ -143,7 +143,7 @@ localproxy start --detached
 For development / foreground:
 
 ```bash
-localproxy daemon
+localproxy run
 ```
 
 ## Test the proxy

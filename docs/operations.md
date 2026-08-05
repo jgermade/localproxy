@@ -1,22 +1,31 @@
 # Operations
 
-## Daemon modes
+## Running modes
 
-localproxy can run in three modes:
+localproxy can run in two modes:
 
 | Mode | Command | Description |
 |---|---|---|
-| Foreground | `localproxy daemon` | Runs in the terminal; exits when the terminal closes. |
+| Service | `localproxy service install && localproxy service start` | Registers a user-level service managed by launchd (macOS) or systemd (Linux). Recommended for daily use. |
 | Detached | `localproxy start --detached` | Spawns the daemon in the background; stdout/stderr go to `localproxy.log`. |
-| Service | `localproxy service install && localproxy start` | Registers a user-level service managed by launchd (macOS) or systemd (Linux). |
+| Foreground | `localproxy run` | Runs in the terminal; exits when the terminal closes. Useful for development and debugging. |
 
-## Service management
+---
 
-### Install and start
+## `localproxy service` commands
+
+These subcommands manage the user-level OS service (launchd on macOS, systemd on Linux).
+
+### Install
 
 ```bash
 localproxy service install
-localproxy start            # starts the service (or asks to run detached if not installed)
+```
+
+### Start
+
+```bash
+localproxy service start
 ```
 
 ### Status
@@ -49,7 +58,11 @@ localproxy service stop
 localproxy service uninstall
 ```
 
-## `localproxy start` behaviour
+---
+
+## Other `localproxy` commands
+
+### `localproxy start` behaviour
 
 1. If a service is installed → runs `service start`.
 2. Otherwise → prompts before doing anything:
@@ -215,9 +228,9 @@ ip route show default
 The binary uses `tracing`. Default level: `info,localproxy=debug`. Override with `RUST_LOG`:
 
 ```bash
-RUST_LOG=debug localproxy daemon
-RUST_LOG=trace localproxy daemon
-RUST_LOG=warn  localproxy daemon
+RUST_LOG=debug localproxy run
+RUST_LOG=trace localproxy run
+RUST_LOG=warn  localproxy run
 ```
 
 ### View logs

@@ -7,7 +7,7 @@ use localproxy::cli::{Cli, Command, ServiceCommand};
 use localproxy::config::{AppConfig, ProxyProtocol, UpstreamConfig};
 
 #[test]
-fn no_subcommand_means_daemon_mode() {
+fn no_subcommand_prints_help() {
     let cli = Cli::try_parse_from(["localproxy"]).unwrap();
 
     assert!(cli.command.is_none());
@@ -16,7 +16,7 @@ fn no_subcommand_means_daemon_mode() {
 #[test]
 fn every_top_level_subcommand_is_accepted() {
     for (args, expected) in [
-        (vec!["localproxy", "daemon"], "Daemon"),
+        (vec!["localproxy", "run"], "Run"),
         (vec!["localproxy", "config"], "Config"),
         (vec!["localproxy", "config-extend"], "ConfigExtend"),
         (vec!["localproxy", "status"], "Status"),
