@@ -121,15 +121,21 @@ concentrated in code that shells out to the OS (`service.rs`), in the interactiv
 
 | Job | Steps |
 |---|---|
-| `check` | `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo check --all-targets`, `cargo test --all-targets` |
+| `check` | `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo check --all-targets`, `cargo check --all-targets --target i686-unknown-linux-gnu`, `cargo test --all-targets` |
 | `coverage` | `scripts/coverage.sh --fail-under 60` |
 | `build` | Release binaries for the four supported targets |
 
 Run the same checks locally before pushing:
 
 ```bash
+make ci                      # local: omite i686 si el target no esta instalado
+make ci REQUIRE_I686=1       # replica CI incluyendo el check i686
+
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets
+cargo check --all-targets --target i686-unknown-linux-gnu
 scripts/coverage.sh --fail-under 60
 ```
+
+`cargo check --target i686-unknown-linux-gnu` requires that target to be installed in the local toolchain. In CI, [build.yml](../.github/workflows/build.yml) installs it explicitly in the `check` job.

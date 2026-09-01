@@ -66,13 +66,12 @@ pub fn apply_nproc(_target: u64) -> Result<u64> {
 /// - If the current soft limit is already at or above the target, returns `None`.
 #[cfg(all(unix, test))]
 fn resolve_nofile_target(soft: u64, hard: u64, target: u64) -> Option<u64> {
-    resolve_soft_limit_target(
+    rlim_t_to_u64(resolve_soft_limit_target(
         rlim_t_from_u64(soft),
         rlim_t_from_u64(hard),
         target,
         DEFAULT_NOFILE_TARGET,
-    )
-    .map(Into::into)
+    ))
 }
 
 #[cfg(unix)]
@@ -98,7 +97,41 @@ fn resolve_soft_limit_target(
 
 #[cfg(unix)]
 fn rlim_t_from_u64(value: u64) -> libc::rlim_t {
-    value.min(libc::rlim_t::MAX as u64) as libc::rlim_t
+    #[cfg(target_pointer_width = "32")]
+    {
+        value.min(u64::from(libc::rlim_t::MAX)) as libc::rlim_t
+    }
+
+    #[cfg(not(target_pointer_width = "32"))]
+    {
+        value as libc::rlim_t
+    }
+}
+
+#[cfg(all(unix, test))]
+fn rlim_t_to_u64(value: Option<libc::rlim_t>) -> Option<u64> {
+    #[cfg(target_pointer_width = "32")]
+    {
+        value.map(u64::from)
+    }
+
+    #[cfg(not(target_pointer_width = "32"))]
+    {
+        value
+    }
+}
+
+#[cfg(unix)]
+fn rlim_t_value_to_u64(value: libc::rlim_t) -> u64 {
+    #[cfg(target_pointer_width = "32")]
+    {
+        u64::from(value)
+    }
+
+    #[cfg(not(target_pointer_width = "32"))]
+    {
+        value
+    }
 }
 
 #[cfg(unix)]
@@ -121,7 +154,7 @@ fn apply_soft_limit(
         let hard = lim.rlim_max;
 
         let Some(new_soft) = resolve_soft_limit_target(soft, hard, target, unlimited_cap) else {
-            return Ok(soft.into());
+            return Ok(rlim_t_value_to_u64(soft));
         };
 
         lim.rlim_cur = new_soft;
@@ -138,19 +171,19 @@ fn apply_soft_limit(
 
         if applied.rlim_cur < new_soft {
             warn!(
-                requested = u64::from(new_soft),
-                applied = u64::from(applied.rlim_cur),
+                requested = rlim_t_value_to_u64(new_soft),
+                applied = rlim_t_value_to_u64(applied.rlim_cur),
                 limit = name,
                 "el kernel no pudo aplicar el límite solicitado"
             );
         }
 
         info!(
-            soft = u64::from(applied.rlim_cur),
+            soft = rlim_t_value_to_u64(applied.rlim_cur),
             limit = name,
             "límite ajustado"
         );
-        Ok(applied.rlim_cur.into())
+        Ok(rlim_t_value_to_u64(applied.rlim_cur))
     }
 }
 

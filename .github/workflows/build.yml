@@ -38,6 +38,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: i686-unknown-linux-gnu
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
@@ -57,6 +58,9 @@ jobs:
 
       - name: cargo check
         run: cargo check --all-targets
+
+      - name: cargo check (i686)
+        run: cargo check --all-targets --target i686-unknown-linux-gnu
 
       - name: cargo test
         run: cargo test --all-targets
