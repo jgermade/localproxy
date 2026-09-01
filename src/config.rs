@@ -331,13 +331,10 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
 ///
 /// An empty answer means "leave the inherited limit untouched" (`None`).
 fn prompt_limits(theme: &ColorfulTheme, current: &LimitsConfig) -> Result<LimitsConfig> {
+    let nofile_default = choose_nofile_prompt_default(current.nofile, current_nofile_soft_limit());
     let nofile: String = Input::with_theme(theme)
         .with_prompt("Max open files (ulimit -n, empty = leave unchanged)")
-        .default(
-            current
-                .nofile
-                .map_or_else(String::new, |value| value.to_string()),
-        )
+        .default(nofile_default)
         .allow_empty(true)
         .interact_text()?;
     let nproc: String = Input::with_theme(theme)
@@ -372,6 +369,42 @@ fn prompt_limits(theme: &ColorfulTheme, current: &LimitsConfig) -> Result<Limits
     };
 
     Ok(LimitsConfig { nofile, nproc })
+}
+
+fn choose_nofile_prompt_default(config_value: Option<u64>, system_value: Option<u64>) -> String {
+    config_value
+        .or(system_value)
+        .map_or_else(String::new, |value| value.to_string())
+}
+
+#[cfg(unix)]
+fn current_nofile_soft_limit() -> Option<u64> {
+    // SAFETY: getrlimit writes into the provided struct for a valid resource id.
+    unsafe {
+        let mut lim = libc::rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        if libc::getrlimit(libc::RLIMIT_NOFILE, &mut lim) != 0 {
+            return None;
+        }
+        Some(rlim_t_to_u64(lim.rlim_cur))
+    }
+}
+
+#[cfg(all(unix, target_pointer_width = "32"))]
+fn rlim_t_to_u64(value: libc::rlim_t) -> u64 {
+    u64::from(value)
+}
+
+#[cfg(all(unix, not(target_pointer_width = "32")))]
+fn rlim_t_to_u64(value: libc::rlim_t) -> u64 {
+    value
+}
+
+#[cfg(not(unix))]
+fn current_nofile_soft_limit() -> Option<u64> {
+    None
 }
 
 fn prompt_notification_icon(
@@ -1050,5 +1083,23 @@ mod tests {
     fn protocol_name_maps_both_protocols() {
         assert_eq!(protocol_name(ProxyProtocol::Http), "http");
         assert_eq!(protocol_name(ProxyProtocol::Socks5), "socks5");
+    }
+
+    #[test]
+    fn nofile_prompt_default_prefers_configured_value() {
+        assert_eq!(
+            choose_nofile_prompt_default(Some(65_536), Some(1_024)),
+            "65536"
+        );
+    }
+
+    #[test]
+    fn nofile_prompt_default_falls_back_to_system_value() {
+        assert_eq!(choose_nofile_prompt_default(None, Some(1_024)), "1024");
+    }
+
+    #[test]
+    fn nofile_prompt_default_is_empty_when_both_values_are_missing() {
+        assert_eq!(choose_nofile_prompt_default(None, None), "");
     }
 }
