@@ -66,23 +66,39 @@ pub fn apply_nproc(_target: u64) -> Result<u64> {
 /// - If the current soft limit is already at or above the target, returns `None`.
 #[cfg(all(unix, test))]
 fn resolve_nofile_target(soft: u64, hard: u64, target: u64) -> Option<u64> {
-    resolve_soft_limit_target(soft, hard, target, DEFAULT_NOFILE_TARGET)
+    resolve_soft_limit_target(
+        rlim_t_from_u64(soft),
+        rlim_t_from_u64(hard),
+        target,
+        DEFAULT_NOFILE_TARGET,
+    )
+    .map(Into::into)
 }
 
 #[cfg(unix)]
-fn resolve_soft_limit_target(soft: u64, hard: u64, target: u64, unlimited_cap: u64) -> Option<u64> {
-    let hard_cap = if hard == libc::RLIM_INFINITY {
-        unlimited_cap
+fn resolve_soft_limit_target(
+    soft: libc::rlim_t,
+    hard: libc::rlim_t,
+    target: u64,
+    unlimited_cap: u64,
+) -> Option<libc::rlim_t> {
+    let hard_cap = if hard == libc::RLIM_INFINITY as libc::rlim_t {
+        rlim_t_from_u64(unlimited_cap)
     } else {
         hard
     };
 
-    let new_soft = target.min(hard_cap);
+    let new_soft = rlim_t_from_u64(target).min(hard_cap);
     if soft >= new_soft {
         None
     } else {
         Some(new_soft)
     }
+}
+
+#[cfg(unix)]
+fn rlim_t_from_u64(value: u64) -> libc::rlim_t {
+    value.min(libc::rlim_t::MAX as u64) as libc::rlim_t
 }
 
 #[cfg(unix)]
@@ -105,7 +121,7 @@ fn apply_soft_limit(
         let hard = lim.rlim_max;
 
         let Some(new_soft) = resolve_soft_limit_target(soft, hard, target, unlimited_cap) else {
-            return Ok(soft);
+            return Ok(soft.into());
         };
 
         lim.rlim_cur = new_soft;
@@ -122,15 +138,19 @@ fn apply_soft_limit(
 
         if applied.rlim_cur < new_soft {
             warn!(
-                requested = new_soft,
-                applied = applied.rlim_cur,
+                requested = u64::from(new_soft),
+                applied = u64::from(applied.rlim_cur),
                 limit = name,
                 "el kernel no pudo aplicar el límite solicitado"
             );
         }
 
-        info!(soft = applied.rlim_cur, limit = name, "límite ajustado");
-        Ok(applied.rlim_cur)
+        info!(
+            soft = u64::from(applied.rlim_cur),
+            limit = name,
+            "límite ajustado"
+        );
+        Ok(applied.rlim_cur.into())
     }
 }
 
@@ -174,11 +194,16 @@ mod tests {
     #[test]
     fn generic_target_resolution_matches_nofile_behavior() {
         assert_eq!(
-            resolve_soft_limit_target(1024, libc::RLIM_INFINITY, 100_000, 65_536),
-            Some(65_536)
+            resolve_soft_limit_target(
+                1024 as libc::rlim_t,
+                libc::RLIM_INFINITY as libc::rlim_t,
+                100_000,
+                65_536,
+            ),
+            Some(65_536 as libc::rlim_t)
         );
         assert_eq!(
-            resolve_soft_limit_target(8_192, 8_192, 65_536, 65_536),
+            resolve_soft_limit_target(8_192 as libc::rlim_t, 8_192 as libc::rlim_t, 65_536, 65_536),
             None
         );
     }
