@@ -60,6 +60,8 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 | 16 | `Fallback port` | text | fallback is `static` | current or `1234` |
 | 17 | `Desktop notifications` | confirm: `y` / `n` | always | current value (`y`) |
 | 18 | `Notification icon path (empty = bundled logo)` | text | notifications are enabled | current value (empty) |
+| 19 | `Max open files (ulimit -n, empty = leave unchanged)` | text | always | current value (empty) |
+| 20 | `Max processes/threads (ulimit -u, empty = leave unchanged)` | text | always | current value (empty) |
 
 > `connect_timeout_ms` is only asked for saved proxies. For `gateway` and `static` entries it is always written as `3000`. Edit the TOML file manually to change it.
 
@@ -300,6 +302,10 @@ type = "direct"
 [notifications]
 enabled = true
 
+[limits]
+nofile = 65536
+nproc = 4096
+
 [[proxy]]
 name = "corp"
 protocol = "http"
@@ -335,6 +341,25 @@ The icon is optional: when it is not set, localproxy uses the logo bundled in th
 > Notifications are best effort: if the desktop notification service is unavailable the failure is only logged at debug level and the proxy keeps running. No administrator privileges are required, but macOS asks the user to allow notifications the first time one is posted.
 >
 > On macOS 26 and later, localproxy posts notifications through `osascript` because the legacy `NSUserNotificationCenter` backend used by `notify-rust` is deprecated and unreliable there. That compatibility path does not support a custom notification image; the small app icon and the app name on the left belong to the process that posts the notification, and changing those requires shipping localproxy inside a signed `.app` bundle.
+
+## [limits]
+
+Resource limits the daemon raises for itself when it starts. These apply in every launch mode — foreground `run`, detached `start --detached`, and the LaunchAgent / systemd service, which all exec `run`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `nofile` | integer | unset | Target soft limit for the number of open file descriptors (`ulimit -n`, `RLIMIT_NOFILE`). When set, the daemon raises its soft limit up to this value, capped at the hard limit. When unset, the inherited limit is left untouched. |
+| `nproc` | integer | unset | Target soft limit for user processes/threads (`ulimit -u`, `RLIMIT_NPROC`). When set, the daemon raises its soft limit up to this value, capped at the hard limit. When unset, the inherited limit is left untouched. |
+
+```toml
+[limits]
+nofile = 65536
+nproc = 4096
+```
+
+> The daemon raises the soft limits itself at startup, so the values take effect even when launched from a shell that already has low limits. When the service is installed, configured limits are also declared in the service definition so hard limits are high enough: the LaunchAgent wraps the executable in `sh -c "ulimit ...; exec ... run"`, and the systemd user unit gets `LimitNOFILE=...` / `LimitNPROC=...` lines when applicable.
+>
+> Raising the soft limit above the hard limit is not possible without elevated privileges; the request is silently capped at the hard limit and a warning is logged.
 
 ## [[proxy]]
 

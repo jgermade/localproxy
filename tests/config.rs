@@ -7,9 +7,9 @@ use std::{
 };
 
 use localproxy::config::{
-    AppConfig, AppPaths, FallbackConfig, ListenConfig, NotificationsConfig, ProxyProtocol,
-    SavedProxy, UpstreamConfig, fallback_allows_direct, gateway_poll_interval_secs, load_or_create,
-    resolve_fallback_endpoint, resolve_upstream_endpoint, save, summarize,
+    AppConfig, AppPaths, FallbackConfig, LimitsConfig, ListenConfig, NotificationsConfig,
+    ProxyProtocol, SavedProxy, UpstreamConfig, fallback_allows_direct, gateway_poll_interval_secs,
+    load_or_create, resolve_fallback_endpoint, resolve_upstream_endpoint, save, summarize,
 };
 
 fn paths_in(dir: &Path) -> AppPaths {
@@ -63,6 +63,8 @@ fn default_config_listens_on_localhost_and_goes_direct() {
     assert!(matches!(config.upstream, UpstreamConfig::None));
     assert!(matches!(config.fallback, FallbackConfig::Direct));
     assert!(config.notifications.enabled);
+    assert_eq!(config.limits.nofile, None);
+    assert_eq!(config.limits.nproc, None);
     assert!(config.proxies.is_empty());
 }
 
@@ -152,8 +154,12 @@ fn toml_roundtrip_preserves_every_section() {
             enabled: false,
             icon: Some("/tmp/custom-icon.png".to_string()),
         },
+        limits: LimitsConfig {
+            nofile: Some(65_536),
+                        nproc: Some(4096),
+                },
         proxies: vec![static_proxy("corp", ProxyProtocol::Socks5)],
-    };
+       };
 
     let serialized = toml::to_string_pretty(&config).unwrap();
     let parsed: AppConfig = toml::from_str(&serialized).unwrap();
@@ -185,6 +191,8 @@ fn toml_roundtrip_preserves_every_section() {
         parsed.notifications.icon.as_deref(),
         Some("/tmp/custom-icon.png")
     );
+    assert_eq!(parsed.limits.nofile, Some(65_536));
+    assert_eq!(parsed.limits.nproc, Some(4096));
 }
 
 #[test]
@@ -192,6 +200,45 @@ fn saved_proxies_are_omitted_when_empty() {
     let serialized = toml::to_string_pretty(&AppConfig::default()).unwrap();
 
     assert!(!serialized.contains("[[proxy]]"));
+}
+
+#[test]
+fn limits_section_is_omitted_when_nofile_is_none() {
+    let serialized = toml::to_string_pretty(&AppConfig::default()).unwrap();
+
+    assert!(!serialized.contains("[limits]"));
+}
+
+#[test]
+fn limits_nofile_roundtrips() {
+    let config = AppConfig {
+        limits: LimitsConfig {
+            nofile: Some(65_536),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let serialized = toml::to_string_pretty(&config).unwrap();
+    let parsed: AppConfig = toml::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed.limits.nofile, Some(65_536));
+}
+
+#[test]
+fn limits_nproc_roundtrips() {
+    let config = AppConfig {
+        limits: LimitsConfig {
+            nproc: Some(4096),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let serialized = toml::to_string_pretty(&config).unwrap();
+    let parsed: AppConfig = toml::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed.limits.nproc, Some(4096));
 }
 
 #[test]

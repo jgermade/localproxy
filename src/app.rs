@@ -12,7 +12,7 @@ use tokio::{signal, sync::RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-use crate::{config, control, gateway, notify, proxy};
+use crate::{config, control, gateway, limits, notify, proxy};
 
 #[derive(Clone)]
 pub struct SharedState {
@@ -25,6 +25,17 @@ pub struct SharedState {
 pub async fn run_daemon(paths: config::AppPaths) -> Result<()> {
     paths.ensure_dirs()?;
     let config = config::load_or_create(&paths)?;
+
+    // Raise resource limits for this process before opening any connections.
+    // This covers every launch mode (foreground, detached, and the service,
+    // which all exec `run`).
+    if let Some(target) = config.limits.nofile {
+        limits::apply_nofile(target)?;
+    }
+    if let Some(target) = config.limits.nproc {
+        limits::apply_nproc(target)?;
+    }
+
     let pid_guard = PidGuard::acquire(&paths)?;
 
     let state = SharedState {

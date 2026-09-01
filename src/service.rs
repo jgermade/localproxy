@@ -170,53 +170,83 @@ fn install_macos(paths: &config::AppPaths) -> Result<()> {
     let plist_path = launch_agent_plist(paths)?;
     let exe = std::env::current_exe().context("no se pudo resolver la ruta del ejecutable")?;
     let home = dirs::home_dir().context("no se pudo resolver HOME")?;
+    let config = config::load_or_create(paths)?;
 
     if let Some(parent) = plist_path.parent() {
         fs::create_dir_all(parent)?;
-    }
+     }
     paths.ensure_dirs()?;
 
     let out_log = paths.state_dir.join("launchd.out.log");
     let err_log = paths.state_dir.join("launchd.err.log");
+
+    // launchd does not expose per-job soft limits, so when at least one limit
+    // is configured we wrap the executable in a shell and raise them before
+    // exec'ing the daemon. The daemon also raises them itself, so this mainly
+    // ensures the hard limits are high enough.
+    let ulimit_prefix = match (config.limits.nofile, config.limits.nproc) {
+        (None, None) => None,
+        (Some(nofile), None) => Some(format!("ulimit -n {nofile};")),
+        (None, Some(nproc)) => Some(format!("ulimit -u {nproc};")),
+        (Some(nofile), Some(nproc)) => Some(format!("ulimit -n {nofile}; ulimit -u {nproc};")),
+    };
+
+    let program_arguments = match ulimit_prefix {
+        Some(prefix) => format!(
+            r#"
+     <key>ProgramArguments</key>
+     <array>
+       <string>/bin/sh</string>
+             <string>-c</string>
+             <string>{prefix} exec {exe} run</string>
+     </array>
+"#,
+            prefix = prefix,
+            exe = xml_escape(&exe.to_string_lossy()),
+        ),
+        None => format!(
+            r#"
+     <key>ProgramArguments</key>
+     <array>
+       <string>{exe}</string>
+             <string>run</string>
+     </array>
+"#,
+            exe = xml_escape(&exe.to_string_lossy()),
+        ),
+    };
+
     let plist_content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-  <dict>
-    <key>Label</key>
-    <string>{label}</string>
+   <dict>
+     <key>Label</key>
+     <string>{label}</string>
+{program_arguments}
+     <key>RunAtLoad</key>
+     <true/>
+     <key>KeepAlive</key>
+     <true/>
 
-    <key>ProgramArguments</key>
-    <array>
-      <string>{exe}</string>
-            <string>run</string>
-    </array>
+     <key>WorkingDirectory</key>
+     <string>{home}</string>
 
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-
-    <key>WorkingDirectory</key>
-    <string>{home}</string>
-
-    <key>StandardOutPath</key>
-    <string>{out_log}</string>
-    <key>StandardErrorPath</key>
-    <string>{err_log}</string>
-  </dict>
+     <key>StandardOutPath</key>
+     <string>{out_log}</string>
+     <key>StandardErrorPath</key>
+     <string>{err_log}</string>
+   </dict>
 </plist>
 "#,
         label = service_label(),
-        exe = xml_escape(&exe.to_string_lossy()),
+        program_arguments = program_arguments,
         home = xml_escape(&home.to_string_lossy()),
         out_log = xml_escape(&out_log.to_string_lossy()),
         err_log = xml_escape(&err_log.to_string_lossy()),
-    );
-
+      );
     fs::write(&plist_path, plist_content)
-        .with_context(|| format!("no se pudo escribir {}", plist_path.display()))?;
-
+          .with_context(|| format!("no se pudo escribir {}", plist_path.display()))?;
     let domain = launchctl_domain();
     let target = format!("{}/{}", domain, service_label());
     let plist = plist_path.to_string_lossy().to_string();
@@ -368,18 +398,32 @@ fn install_linux(paths: &config::AppPaths) -> Result<()> {
     let unit_path = systemd_user_unit(paths)?;
     let exe = std::env::current_exe().context("no se pudo resolver la ruta del ejecutable")?;
     let home = dirs::home_dir().context("no se pudo resolver HOME")?;
+    let config = config::load_or_create(paths)?;
 
     if let Some(parent) = unit_path.parent() {
         fs::create_dir_all(parent)?;
-    }
+      }
+
+    // When limits are configured, declare them in the unit so the hard limits
+    // are high enough for the daemon to raise its own soft limits.
+    let limit_nofile = match config.limits.nofile {
+        Some(nofile) => format!("LimitNOFILE={nofile}\n"),
+        None => String::new(),
+    };
+    let limit_nproc = match config.limits.nproc {
+        Some(nproc) => format!("LimitNPROC={nproc}\n"),
+        None => String::new(),
+    };
 
     let unit = format!(
-        "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} run\nWorkingDirectory={}\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+         "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} run\nWorkingDirectory={}\n{limit_nofile}{limit_nproc}Restart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         exe.display(),
         home.display(),
+        limit_nofile = limit_nofile,
+        limit_nproc = limit_nproc,
     );
     fs::write(&unit_path, unit)
-        .with_context(|| format!("no se pudo escribir {}", unit_path.display()))?;
+          .with_context(|| format!("no se pudo escribir {}", unit_path.display()))?;
 
     run_cmd("systemctl", &["--user", "daemon-reload"])?;
     run_cmd("systemctl", &["--user", "enable", SERVICE_UNIT])?;

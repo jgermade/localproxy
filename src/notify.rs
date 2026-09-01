@@ -45,7 +45,9 @@ fn send(icon: Option<PathBuf>, summary: &str, body: &str) {
     {
         let _ = icon;
 
-        if let Err(error) = send_macos(summary, body) {
+        // En macOS Tahoe, notify-rust puede devolver éxito aunque la notificación
+        // no llegue al usuario. osascript es más fiable aquí.
+        if let Err(error) = send_macos_script(summary, body) {
             debug!(%error, "no se pudo enviar la notificación de escritorio");
         }
     }
@@ -67,7 +69,7 @@ fn send(icon: Option<PathBuf>, summary: &str, body: &str) {
 }
 
 #[cfg(target_os = "macos")]
-fn send_macos(summary: &str, body: &str) -> Result<()> {
+fn send_macos_script(summary: &str, body: &str) -> Result<()> {
     let scripts = [
         format!(
             "display notification {} with title {}",
