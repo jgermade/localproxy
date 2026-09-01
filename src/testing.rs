@@ -30,6 +30,9 @@ pub fn state(paths: config::AppPaths, mut config: config::AppConfig) -> SharedSt
         paths,
         config: Arc::new(RwLock::new(config)),
         gateway_ip: Arc::new(RwLock::new(None)),
+        upstream_failures: Arc::new(tokio::sync::Mutex::new(
+            crate::app::UpstreamFailureTracker::default(),
+        )),
         shutdown: CancellationToken::new(),
     }
 }

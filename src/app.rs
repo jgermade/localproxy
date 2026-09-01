@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -19,7 +20,16 @@ pub struct SharedState {
     pub paths: config::AppPaths,
     pub config: Arc<RwLock<config::AppConfig>>,
     pub gateway_ip: Arc<RwLock<Option<std::net::IpAddr>>>,
+    pub upstream_failures: Arc<tokio::sync::Mutex<UpstreamFailureTracker>>,
     pub shutdown: CancellationToken,
+}
+
+#[derive(Debug, Default)]
+pub struct UpstreamFailureTracker {
+    pub consecutive_failures: u32,
+    pub first_failure_at: Option<Instant>,
+    pub last_failure_at: Option<Instant>,
+    pub last_notified_at: Option<Instant>,
 }
 
 pub async fn run_daemon(paths: config::AppPaths) -> Result<()> {
@@ -42,6 +52,7 @@ pub async fn run_daemon(paths: config::AppPaths) -> Result<()> {
         paths: paths.clone(),
         config: Arc::new(RwLock::new(config)),
         gateway_ip: Arc::new(RwLock::new(None)),
+        upstream_failures: Arc::new(tokio::sync::Mutex::new(UpstreamFailureTracker::default())),
         shutdown: CancellationToken::new(),
     };
 

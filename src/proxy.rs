@@ -1,4 +1,7 @@
-use std::{net::IpAddr, time::Duration};
+use std::{
+    net::IpAddr,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use http::Uri;
@@ -10,12 +13,16 @@ use tokio::{
 use tracing::{debug, info, warn};
 
 use crate::{
-    app::SharedState,
+    app::{SharedState, UpstreamFailureTracker},
     config::{self, AppConfig, ProxyEndpoint, ProxyProtocol},
+    notify,
     stream::ProxyStream,
 };
 
 const MAX_HEADER_BYTES: usize = 64 * 1024;
+const UPSTREAM_FAILURE_NOTIFY_THRESHOLD: u32 = 3;
+const UPSTREAM_FAILURE_WINDOW: Duration = Duration::from_secs(20);
+const UPSTREAM_FAILURE_NOTIFY_COOLDOWN: Duration = Duration::from_secs(60);
 
 pub async fn serve(state: SharedState) -> Result<()> {
     let listen_addr = state.config.read().await.listen.socket_addr();
@@ -56,13 +63,16 @@ async fn handle_connect(
     request: HttpRequestHead,
     state: SharedState,
 ) -> Result<()> {
-    let routes = resolve_routes(&state).await;
+    let (routes, upstream_present) = resolve_routes(&state).await;
     let target = request.target.clone();
     let mut last_error = None;
 
-    for route in routes {
+    for (index, route) in routes.iter().enumerate() {
         match connect_tunnel(&route, &target).await {
             Ok(mut upstream) => {
+                if upstream_present && index == 0 {
+                    reset_upstream_failure_streak(&state).await;
+                }
                 client
                     .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                     .await?;
@@ -71,6 +81,9 @@ async fn handle_connect(
             }
             Err(error) => {
                 debug!(route = %describe_route(&route), %error, "falló intento CONNECT");
+                if upstream_present && index == 0 {
+                    maybe_notify_upstream_failure(&state, route, &error).await;
+                }
                 last_error = Some(error);
             }
         }
@@ -89,12 +102,15 @@ async fn handle_http(
     state: SharedState,
 ) -> Result<()> {
     let destination = extract_destination(&request)?;
-    let routes = resolve_routes(&state).await;
+    let (routes, upstream_present) = resolve_routes(&state).await;
     let mut last_error = None;
 
-    for route in routes {
+    for (index, route) in routes.iter().enumerate() {
         match connect_for_http(&route, &request, &destination).await {
             Ok((mut upstream, outbound_head)) => {
+                if upstream_present && index == 0 {
+                    reset_upstream_failure_streak(&state).await;
+                }
                 upstream.write_all(&outbound_head).await?;
                 if !buffered_body.is_empty() {
                     upstream.write_all(&buffered_body).await?;
@@ -104,6 +120,9 @@ async fn handle_http(
             }
             Err(error) => {
                 debug!(route = %describe_route(&route), %error, "falló intento HTTP");
+                if upstream_present && index == 0 {
+                    maybe_notify_upstream_failure(&state, route, &error).await;
+                }
                 last_error = Some(error);
             }
         }
@@ -387,10 +406,87 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
         .map(|index| index + 4)
 }
 
-async fn resolve_routes(state: &SharedState) -> Vec<Route> {
+async fn resolve_routes(state: &SharedState) -> (Vec<Route>, bool) {
     let config = state.config.read().await.clone();
     let gateway = *state.gateway_ip.read().await;
-    resolve_routes_from_config(&config, gateway)
+    let upstream_present = config::resolve_upstream_endpoint(&config, gateway).is_some();
+    (resolve_routes_from_config(&config, gateway), upstream_present)
+}
+
+async fn maybe_notify_upstream_failure(state: &SharedState, route: &Route, error: &anyhow::Error) {
+    let now = Instant::now();
+    let (should_notify, consecutive) = {
+        let mut tracker = state.upstream_failures.lock().await;
+        let should_notify = record_upstream_failure(
+            &mut tracker,
+            now,
+            UPSTREAM_FAILURE_NOTIFY_THRESHOLD,
+            UPSTREAM_FAILURE_WINDOW,
+            UPSTREAM_FAILURE_NOTIFY_COOLDOWN,
+        );
+        (should_notify, tracker.consecutive_failures)
+    };
+
+    if !should_notify {
+        return;
+    }
+
+    let route_desc = describe_route(route);
+    let message = format!(
+        "{route_desc} falló {consecutive} veces seguidas. Último error: {error}"
+    );
+
+    let config = state.config.read().await;
+    notify::notify(
+        &config.notifications,
+        "upstream no disponible",
+        &message,
+    );
+    warn!(route = %route_desc, consecutive, %error, "upstream no disponible repetidamente");
+}
+
+async fn reset_upstream_failure_streak(state: &SharedState) {
+    let mut tracker = state.upstream_failures.lock().await;
+    clear_upstream_failures(&mut tracker);
+}
+
+fn clear_upstream_failures(tracker: &mut UpstreamFailureTracker) {
+    tracker.consecutive_failures = 0;
+    tracker.first_failure_at = None;
+    tracker.last_failure_at = None;
+}
+
+fn record_upstream_failure(
+    tracker: &mut UpstreamFailureTracker,
+    now: Instant,
+    threshold: u32,
+    window: Duration,
+    cooldown: Duration,
+) -> bool {
+    if let Some(last_failure_at) = tracker.last_failure_at
+        && now.duration_since(last_failure_at) > window
+    {
+        clear_upstream_failures(tracker);
+    }
+
+    tracker.consecutive_failures = tracker.consecutive_failures.saturating_add(1);
+    if tracker.first_failure_at.is_none() {
+        tracker.first_failure_at = Some(now);
+    }
+    tracker.last_failure_at = Some(now);
+
+    if tracker.consecutive_failures < threshold {
+        return false;
+    }
+
+    if let Some(last_notified_at) = tracker.last_notified_at
+        && now.duration_since(last_notified_at) < cooldown
+    {
+        return false;
+    }
+
+    tracker.last_notified_at = Some(now);
+    true
 }
 
 fn resolve_routes_from_config(config: &AppConfig, gateway: Option<IpAddr>) -> Vec<Route> {
@@ -782,10 +878,89 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let state = crate::testing::state(crate::testing::paths(dir.path()), AppConfig::default());
 
-        let routes = resolve_routes(&state).await;
+        let (routes, upstream_present) = resolve_routes(&state).await;
 
         assert_eq!(routes.len(), 1);
+        assert!(!upstream_present);
         assert!(matches!(routes[0], Route::Direct));
+    }
+
+    #[test]
+    fn upstream_failure_streak_notifies_after_threshold() {
+        let mut tracker = UpstreamFailureTracker::default();
+        let start = Instant::now();
+
+        assert!(!record_upstream_failure(
+            &mut tracker,
+            start,
+            3,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+        assert!(!record_upstream_failure(
+            &mut tracker,
+            start + Duration::from_secs(1),
+            3,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+        assert!(record_upstream_failure(
+            &mut tracker,
+            start + Duration::from_secs(2),
+            3,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+    }
+
+    #[test]
+    fn upstream_failure_notification_respects_cooldown() {
+        let mut tracker = UpstreamFailureTracker::default();
+        let start = Instant::now();
+
+        assert!(record_upstream_failure(
+            &mut tracker,
+            start,
+            1,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+        assert!(!record_upstream_failure(
+            &mut tracker,
+            start + Duration::from_secs(5),
+            1,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+        assert!(record_upstream_failure(
+            &mut tracker,
+            start + Duration::from_secs(61),
+            1,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+    }
+
+    #[test]
+    fn upstream_failure_streak_resets_after_window() {
+        let mut tracker = UpstreamFailureTracker::default();
+        let start = Instant::now();
+
+        assert!(!record_upstream_failure(
+            &mut tracker,
+            start,
+            3,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+        assert!(!record_upstream_failure(
+            &mut tracker,
+            start + Duration::from_secs(30),
+            3,
+            Duration::from_secs(20),
+            Duration::from_secs(60),
+        ));
+        assert_eq!(tracker.consecutive_failures, 1);
     }
 
     #[test]
