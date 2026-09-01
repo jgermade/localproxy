@@ -25,7 +25,7 @@ const DEFAULT_NOFILE_TARGET: u64 = 65_536;
 #[cfg(unix)]
 pub fn apply_nofile(target: u64) -> Result<u64> {
     apply_soft_limit(
-        libc::RLIMIT_NOFILE,
+        libc::RLIMIT_NOFILE as libc::c_int,
         target,
         DEFAULT_NOFILE_TARGET,
         "file descriptors",
@@ -37,7 +37,7 @@ pub fn apply_nofile(target: u64) -> Result<u64> {
 #[cfg(unix)]
 pub fn apply_nproc(target: u64) -> Result<u64> {
     apply_soft_limit(
-        libc::RLIMIT_NPROC,
+        libc::RLIMIT_NPROC as libc::c_int,
         target,
         DEFAULT_NOFILE_TARGET,
         "processes/threads",

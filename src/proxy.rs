@@ -68,7 +68,7 @@ async fn handle_connect(
     let mut last_error = None;
 
     for (index, route) in routes.iter().enumerate() {
-        match connect_tunnel(&route, &target).await {
+        match connect_tunnel(route, &target).await {
             Ok(mut upstream) => {
                 if upstream_present && index == 0 {
                     reset_upstream_failure_streak(&state).await;
@@ -80,7 +80,7 @@ async fn handle_connect(
                 return Ok(());
             }
             Err(error) => {
-                debug!(route = %describe_route(&route), %error, "falló intento CONNECT");
+                debug!(route = %describe_route(route), %error, "falló intento CONNECT");
                 if upstream_present && index == 0 {
                     maybe_notify_upstream_failure(&state, route, &error).await;
                 }
@@ -106,7 +106,7 @@ async fn handle_http(
     let mut last_error = None;
 
     for (index, route) in routes.iter().enumerate() {
-        match connect_for_http(&route, &request, &destination).await {
+        match connect_for_http(route, &request, &destination).await {
             Ok((mut upstream, outbound_head)) => {
                 if upstream_present && index == 0 {
                     reset_upstream_failure_streak(&state).await;
@@ -119,7 +119,7 @@ async fn handle_http(
                 return Ok(());
             }
             Err(error) => {
-                debug!(route = %describe_route(&route), %error, "falló intento HTTP");
+                debug!(route = %describe_route(route), %error, "falló intento HTTP");
                 if upstream_present && index == 0 {
                     maybe_notify_upstream_failure(&state, route, &error).await;
                 }
