@@ -4,7 +4,14 @@
 //! never interrupt the proxy. Notifications can be turned off with `[notifications]
 //! enabled = false` in the config file.
 
-use std::{fs, path::PathBuf, sync::OnceLock};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use anyhow::Result;
 #[cfg(target_os = "macos")]
@@ -28,15 +35,45 @@ pub fn notify(config: &NotificationsConfig, summary: &str, body: &str) {
         return;
     }
 
+    let Some(permit) = NotificationPermit::acquire() else {
+        debug!("se omite notificación: ya hay un envío en progreso");
+        return;
+    };
+
     let icon = icon_path(config);
     let summary = summary.to_string();
     let body = body.to_string();
 
     match tokio::runtime::Handle::try_current() {
         Ok(handle) => {
-            handle.spawn_blocking(move || send(icon, &summary, &body));
+            handle.spawn_blocking(move || {
+                let _permit = permit;
+                send(icon, &summary, &body)
+            });
         }
-        Err(_) => send(icon, &summary, &body),
+        Err(_) => {
+            let _permit = permit;
+            send(icon, &summary, &body)
+        }
+    }
+}
+
+static NOTIFY_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+struct NotificationPermit;
+
+impl NotificationPermit {
+    fn acquire() -> Option<Self> {
+        NOTIFY_IN_FLIGHT
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| Self)
+    }
+}
+
+impl Drop for NotificationPermit {
+    fn drop(&mut self) {
+        NOTIFY_IN_FLIGHT.store(false, Ordering::Release);
     }
 }
 

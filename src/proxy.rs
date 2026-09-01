@@ -35,16 +35,28 @@ pub async fn serve(state: SharedState) -> Result<()> {
         tokio::select! {
             _ = state.shutdown.cancelled() => return Ok(()),
             accepted = listener.accept() => {
-                let (socket, remote_addr) = accepted?;
-                let request_state = state.clone();
-                tokio::spawn(async move {
-                    if let Err(error) = handle_client(socket, request_state).await {
-                        warn!(client = %remote_addr, %error, "petición proxy fallida");
+                match accepted {
+                    Ok((socket, remote_addr)) => {
+                        let request_state = state.clone();
+                        tokio::spawn(async move {
+                            if let Err(error) = handle_client(socket, request_state).await {
+                                warn!(client = %remote_addr, %error, "petición proxy fallida");
+                            }
+                        });
                     }
-                });
+                    Err(error) if is_fd_exhaustion(&error) => {
+                        warn!(%error, "se alcanzó el límite de descriptores abiertos; reintentando accept");
+                        time::sleep(Duration::from_millis(200)).await;
+                    }
+                    Err(error) => return Err(error.into()),
+                }
             }
         }
     }
+}
+
+fn is_fd_exhaustion(error: &std::io::Error) -> bool {
+    matches!(error.raw_os_error(), Some(code) if code == libc::EMFILE || code == libc::ENFILE)
 }
 
 async fn handle_client(mut client: TcpStream, state: SharedState) -> Result<()> {
