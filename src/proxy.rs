@@ -410,7 +410,10 @@ async fn resolve_routes(state: &SharedState) -> (Vec<Route>, bool) {
     let config = state.config.read().await.clone();
     let gateway = *state.gateway_ip.read().await;
     let upstream_present = config::resolve_upstream_endpoint(&config, gateway).is_some();
-    (resolve_routes_from_config(&config, gateway), upstream_present)
+    (
+        resolve_routes_from_config(&config, gateway),
+        upstream_present,
+    )
 }
 
 async fn maybe_notify_upstream_failure(state: &SharedState, route: &Route, error: &anyhow::Error) {
@@ -432,16 +435,10 @@ async fn maybe_notify_upstream_failure(state: &SharedState, route: &Route, error
     }
 
     let route_desc = describe_route(route);
-    let message = format!(
-        "{route_desc} falló {consecutive} veces seguidas. Último error: {error}"
-    );
+    let message = format!("{route_desc} falló {consecutive} veces seguidas. Último error: {error}");
 
     let config = state.config.read().await;
-    notify::notify(
-        &config.notifications,
-        "upstream no disponible",
-        &message,
-    );
+    notify::notify(&config.notifications, "upstream no disponible", &message);
     warn!(route = %route_desc, consecutive, %error, "upstream no disponible repetidamente");
 }
 

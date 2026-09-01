@@ -174,7 +174,7 @@ fn install_macos(paths: &config::AppPaths) -> Result<()> {
 
     if let Some(parent) = plist_path.parent() {
         fs::create_dir_all(parent)?;
-     }
+    }
     paths.ensure_dirs()?;
 
     let out_log = paths.state_dir.join("launchd.out.log");
@@ -244,9 +244,9 @@ fn install_macos(paths: &config::AppPaths) -> Result<()> {
         home = xml_escape(&home.to_string_lossy()),
         out_log = xml_escape(&out_log.to_string_lossy()),
         err_log = xml_escape(&err_log.to_string_lossy()),
-      );
+    );
     fs::write(&plist_path, plist_content)
-          .with_context(|| format!("no se pudo escribir {}", plist_path.display()))?;
+        .with_context(|| format!("no se pudo escribir {}", plist_path.display()))?;
     let domain = launchctl_domain();
     let target = format!("{}/{}", domain, service_label());
     let plist = plist_path.to_string_lossy().to_string();
@@ -402,7 +402,7 @@ fn install_linux(paths: &config::AppPaths) -> Result<()> {
 
     if let Some(parent) = unit_path.parent() {
         fs::create_dir_all(parent)?;
-      }
+    }
 
     // When limits are configured, declare them in the unit so the hard limits
     // are high enough for the daemon to raise its own soft limits.
@@ -416,14 +416,14 @@ fn install_linux(paths: &config::AppPaths) -> Result<()> {
     };
 
     let unit = format!(
-         "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} run\nWorkingDirectory={}\n{limit_nofile}{limit_nproc}Restart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+        "[Unit]\nDescription=localproxy local proxy daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} run\nWorkingDirectory={}\n{limit_nofile}{limit_nproc}Restart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         exe.display(),
         home.display(),
         limit_nofile = limit_nofile,
         limit_nproc = limit_nproc,
     );
     fs::write(&unit_path, unit)
-          .with_context(|| format!("no se pudo escribir {}", unit_path.display()))?;
+        .with_context(|| format!("no se pudo escribir {}", unit_path.display()))?;
 
     run_cmd("systemctl", &["--user", "daemon-reload"])?;
     run_cmd("systemctl", &["--user", "enable", SERVICE_UNIT])?;

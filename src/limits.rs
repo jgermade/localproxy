@@ -177,6 +177,9 @@ mod tests {
             resolve_soft_limit_target(1024, libc::RLIM_INFINITY, 100_000, 65_536),
             Some(65_536)
         );
-        assert_eq!(resolve_soft_limit_target(8_192, 8_192, 65_536, 65_536), None);
+        assert_eq!(
+            resolve_soft_limit_target(8_192, 8_192, 65_536, 65_536),
+            None
+        );
     }
 }

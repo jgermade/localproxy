@@ -61,9 +61,9 @@ pub struct AppConfig {
     pub fallback: FallbackConfig,
     #[serde(default)]
     pub notifications: NotificationsConfig,
-     #[serde(default, skip_serializing_if = "LimitsConfig::is_empty")]
+    #[serde(default, skip_serializing_if = "LimitsConfig::is_empty")]
     pub limits: LimitsConfig,
-      #[serde(default, rename = "proxy", skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, rename = "proxy", skip_serializing_if = "Vec::is_empty")]
     pub proxies: Vec<SavedProxy>,
 }
 
@@ -173,25 +173,25 @@ impl Default for NotificationsConfig {
 /// LaunchAgent / systemd service, which all exec `run`).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LimitsConfig {
-      /// Soft limit for the number of open file descriptors (RLIMIT_NOFILE).
-      ///
-      /// When set, the daemon raises its soft limit up to this value (capped at
-      /// the hard limit). `None` leaves the inherited limit untouched.
-      #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Soft limit for the number of open file descriptors (RLIMIT_NOFILE).
+    ///
+    /// When set, the daemon raises its soft limit up to this value (capped at
+    /// the hard limit). `None` leaves the inherited limit untouched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nofile: Option<u64>,
-            /// Soft limit for the number of processes/threads (RLIMIT_NPROC).
-            ///
-            /// When set, the daemon raises its soft limit up to this value (capped at
-            /// the hard limit). `None` leaves the inherited limit untouched.
-            #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub nproc: Option<u64>,
+    /// Soft limit for the number of processes/threads (RLIMIT_NPROC).
+    ///
+    /// When set, the daemon raises its soft limit up to this value (capped at
+    /// the hard limit). `None` leaves the inherited limit untouched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nproc: Option<u64>,
 }
 
 impl LimitsConfig {
     /// Whether the section carries no value, so it can be omitted from the TOML.
     pub fn is_empty(&self) -> bool {
         self.nofile.is_none() && self.nproc.is_none()
-     }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -315,16 +315,16 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
         listen: ListenConfig {
             host: listen_host,
             port: listen_port,
-         },
+        },
         upstream,
         fallback,
         notifications: NotificationsConfig {
             enabled: notifications_enabled,
             icon: notifications_icon,
-         },
+        },
         limits,
         proxies,
-     })
+    })
 }
 
 /// Prompts for the resource limits the daemon should raise for itself.
@@ -332,36 +332,44 @@ pub fn run_wizard(current: AppConfig) -> Result<AppConfig> {
 /// An empty answer means "leave the inherited limit untouched" (`None`).
 fn prompt_limits(theme: &ColorfulTheme, current: &LimitsConfig) -> Result<LimitsConfig> {
     let nofile: String = Input::with_theme(theme)
-           .with_prompt("Max open files (ulimit -n, empty = leave unchanged)")
-           .default(current.nofile.map_or_else(String::new, |value| value.to_string()))
-           .allow_empty(true)
-           .interact_text()?;
+        .with_prompt("Max open files (ulimit -n, empty = leave unchanged)")
+        .default(
+            current
+                .nofile
+                .map_or_else(String::new, |value| value.to_string()),
+        )
+        .allow_empty(true)
+        .interact_text()?;
     let nproc: String = Input::with_theme(theme)
-           .with_prompt("Max processes/threads (ulimit -u, empty = leave unchanged)")
-           .default(current.nproc.map_or_else(String::new, |value| value.to_string()))
-           .allow_empty(true)
-           .interact_text()?;
+        .with_prompt("Max processes/threads (ulimit -u, empty = leave unchanged)")
+        .default(
+            current
+                .nproc
+                .map_or_else(String::new, |value| value.to_string()),
+        )
+        .allow_empty(true)
+        .interact_text()?;
 
     let nofile = nofile.trim();
     let nofile = if nofile.is_empty() {
         None
-       } else {
+    } else {
         Some(
             nofile
-                   .parse::<u64>()
-                   .with_context(|| format!("valor no válido para ulimit -n: {nofile}"))?,
-           )
-       };
+                .parse::<u64>()
+                .with_context(|| format!("valor no válido para ulimit -n: {nofile}"))?,
+        )
+    };
     let nproc = nproc.trim();
     let nproc = if nproc.is_empty() {
         None
-       } else {
+    } else {
         Some(
             nproc
-                   .parse::<u64>()
-                   .with_context(|| format!("valor no válido para ulimit -u: {nproc}"))?,
-           )
-       };
+                .parse::<u64>()
+                .with_context(|| format!("valor no válido para ulimit -u: {nproc}"))?,
+        )
+    };
 
     Ok(LimitsConfig { nofile, nproc })
 }

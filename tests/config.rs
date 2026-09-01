@@ -156,10 +156,10 @@ fn toml_roundtrip_preserves_every_section() {
         },
         limits: LimitsConfig {
             nofile: Some(65_536),
-                        nproc: Some(4096),
-                },
+            nproc: Some(4096),
+        },
         proxies: vec![static_proxy("corp", ProxyProtocol::Socks5)],
-       };
+    };
 
     let serialized = toml::to_string_pretty(&config).unwrap();
     let parsed: AppConfig = toml::from_str(&serialized).unwrap();
