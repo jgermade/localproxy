@@ -191,6 +191,18 @@ fn apply_soft_limit(
 mod tests {
     use super::*;
 
+    fn test_rlim_infinity_u64() -> u64 {
+        #[cfg(target_pointer_width = "32")]
+        {
+            u64::from(libc::RLIM_INFINITY)
+        }
+
+        #[cfg(not(target_pointer_width = "32"))]
+        {
+            libc::RLIM_INFINITY
+        }
+    }
+
     #[test]
     fn raises_soft_up_to_target_when_below_hard() {
         // soft 1024, hard 65536, target 32768 -> request 32768.
@@ -207,7 +219,7 @@ mod tests {
     fn caps_unlimited_hard_at_default_target() {
         // soft 1024, hard unlimited, target 1_000_000 -> capped at default.
         assert_eq!(
-            resolve_nofile_target(1024, libc::RLIM_INFINITY, 1_000_000),
+            resolve_nofile_target(1024, test_rlim_infinity_u64(), 1_000_000),
             Some(DEFAULT_NOFILE_TARGET)
         );
     }
