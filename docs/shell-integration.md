@@ -68,7 +68,7 @@ proxy-on() {
 }
 
 proxy-off() {
-  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+  unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
   echo "proxy off"
 }
 
@@ -143,6 +143,9 @@ localproxy-down() {
   localproxy stop > /dev/null 2>&1
 }
 ```
+
+If you use the installer snippet, `localproxy stop`, `localproxy service stop` and
+`localproxy purge` already clear those env vars in the current shell session.
 
 For an always-running daemon, prefer the service (see
 [operations.md](operations.md)):

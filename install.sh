@@ -265,6 +265,30 @@ write_block() {
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then
+  localproxy-env-off() {
+    unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
+  }
+
+  localproxy() {
+    if [ "$#" -eq 0 ]; then
+      command localproxy
+      return $?
+    fi
+
+    command localproxy "$@"
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+      if [ "$1" = "stop" ] || [ "$1" = "purge" ]; then
+        localproxy-env-off
+      elif [ "$1" = "service" ] && [ "${2:-}" = "stop" ]; then
+        localproxy-env-off
+      fi
+    fi
+
+    return $rc
+  }
+
   # The listen address lives in ~/.config/localproxy/config.toml, so the URL is read
   # from there on every shell start instead of being hardcoded here.
   LOCALPROXY_URL="$(localproxy url 2> /dev/null)"

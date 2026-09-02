@@ -185,6 +185,30 @@ LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then
+  localproxy-env-off() {
+    unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
+  }
+
+  localproxy() {
+    if [ "$#" -eq 0 ]; then
+      command localproxy
+      return $?
+    fi
+
+    command localproxy "$@"
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+      if [ "$1" = "stop" ] || [ "$1" = "purge" ]; then
+        localproxy-env-off
+      elif [ "$1" = "service" ] && [ "${2:-}" = "stop" ]; then
+        localproxy-env-off
+      fi
+    fi
+
+    return $rc
+  }
+
   # `localproxy status` talks to the control socket, so it only succeeds when the
   # daemon is really listening. Start it in the background otherwise.
   localproxy status > /dev/null 2>&1 || localproxy start --detached > /dev/null 2>&1
@@ -219,6 +243,8 @@ Notes:
 
 - Lowercase and uppercase variables are both exported because tools disagree: `curl` and most Unix
   tools read the lowercase names, many language runtimes read the uppercase ones.
+- The wrapper function above makes `localproxy stop`, `localproxy service stop` and
+  `localproxy purge` unset proxy env vars in the current shell session.
 - If you registered the service with `localproxy service install`, replace `localproxy start --detached`
   with `localproxy service start` so the service manager owns the process.
 - `localproxy start` without `--detached` asks for confirmation when no service is installed, so it is
@@ -249,6 +275,17 @@ listen=127.0.0.1:1234 upstream=none fallback=direct gateway=unknown
 ```bash
 localproxy stop
 ```
+
+With the installer snippet loaded, this also unsets `http_proxy` / `https_proxy`
+(`all_proxy`, uppercase variants and `no_proxy`) in the current shell.
+
+## Full cleanup
+
+```bash
+localproxy purge
+```
+
+Use `localproxy purge --confirm` in scripts to skip the interactive confirmation.
 
 ## Notes
 

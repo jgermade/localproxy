@@ -86,6 +86,16 @@ localproxy reload
 localproxy stop
 ```
 
+Full cleanup command:
+
+```bash
+localproxy purge
+```
+
+`purge` stops the daemon (best effort), uninstalls the service (best effort),
+removes config/state directories, removes the localproxy shell block from your
+profile and deletes the current binary.
+
 ## `localproxy status` output
 
 ```text

@@ -71,6 +71,30 @@ LOCALPROXY_URL="http://127.0.0.1:1234"
 LOCALPROXY_NO_PROXY="localhost,127.0.0.1,::1"
 
 if command -v localproxy > /dev/null 2>&1; then
+  localproxy-env-off() {
+    unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
+  }
+
+  localproxy() {
+    if [ "$#" -eq 0 ]; then
+      command localproxy
+      return $?
+    fi
+
+    command localproxy "$@"
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+      if [ "$1" = "stop" ] || [ "$1" = "purge" ]; then
+        localproxy-env-off
+      elif [ "$1" = "service" ] && [ "${2:-}" = "stop" ]; then
+        localproxy-env-off
+      fi
+    fi
+
+    return $rc
+  }
+
   # `localproxy status` talks to the control socket, so it only succeeds when the
   # daemon is really listening. Start it in the background otherwise.
   localproxy status > /dev/null 2>&1 || localproxy start --detached > /dev/null 2>&1
@@ -91,6 +115,8 @@ Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
 
 - Both cases are exported on purpose: `curl` and most Unix tools read the lowercase names, while
   many language runtimes read the uppercase ones.
+- The wrapper function above makes `localproxy stop`, `localproxy service stop` and
+  `localproxy purge` unset proxy env vars in the current shell session.
 - If you registered the service (`localproxy service install`), replace `localproxy start --detached` with
   `localproxy service start`.
 - Extend `LOCALPROXY_NO_PROXY` with the hosts that must bypass the proxy, e.g.
@@ -121,6 +147,7 @@ Reload with `source ~/.zshrc` (or `~/.bashrc`). Notes:
 | `localproxy start` | Start the service if installed; otherwise ask to run detached. |
 | `localproxy start --detached` | Start `localproxy run` in the background without registering a service. |
 | `localproxy logs [--lines N] [--follow] [--detached]` | Show logs from the service or the detached log file. |
+| `localproxy purge [--confirm]` | Remove binary, config/state directories and shell snippet. |
 | `localproxy paths` | Print config, state, socket and pid file paths. |
 | `localproxy url` | Print the proxy URL built from the listen address in `config.toml`. |
 

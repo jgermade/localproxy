@@ -24,6 +24,7 @@ fn every_top_level_subcommand_is_accepted() {
         (vec!["localproxy", "reload"], "Reload"),
         (vec!["localproxy", "paths"], "Paths"),
         (vec!["localproxy", "url"], "Url"),
+        (vec!["localproxy", "purge"], "Purge"),
     ] {
         let cli = Cli::try_parse_from(&args).unwrap();
         let rendered = format!("{:?}", cli.command.unwrap());
