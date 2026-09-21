@@ -46,7 +46,7 @@ The wizard asks these questions, in order. Some prompts only appear depending on
 | 2 | `Listen port` | text | always | current value (`1234`) |
 | 3 | `Proxies guardados` | menu: saved proxies + `+ añadir proxy` / `- eliminar proxy` / `continuar` | always | `continuar` |
 | 4 | `Nombre del proxy`, `Proxy protocol`, `Host`, `Puerto`, `Connect timeout (ms)` | text + list | adding or editing a saved proxy | current values |
-| 5 | `Upstream type` | list: `none` / `gateway` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
+| 5 | `Upstream type` | list: `none` / `direct` / `gateway` / `saved` / `static` | always (`saved` only when the list is not empty) | current type |
 | 6 | `Proxy protocol` | list: `http` / `socks5` | upstream is `gateway` or `static` | current protocol |
 | 7 | `Gateway upstream port` | text | upstream is `gateway` | current or `1234` |
 | 8 | `Gateway poll interval (seconds)` | text | upstream is `gateway` | current or `5` |
@@ -229,7 +229,41 @@ $ localproxy config
 reloaded: listen=127.0.0.1:1234 upstream=static:http:proxy-a.internal:1234 fallback=static:http:proxy-b.internal:1234 gateway=unknown
 ```
 
-### Example 5 — Running the wizard when the daemon is stopped
+### Example 5 — Direct upstream with a proxy fallback
+
+Prefers a direct connection and only falls back to the proxy when the direct route fails.
+
+```console
+$ localproxy config
+✔ Listen host · 127.0.0.1
+✔ Listen port · 1234
+✔ Upstream type · direct
+✔ Fallback type · static
+✔ Proxy protocol · http
+✔ Fallback host · proxy-b.internal
+✔ Fallback port · 1234
+reloaded: listen=127.0.0.1:1234 upstream=direct fallback=static:http:proxy-b.internal:1234 gateway=unknown
+```
+
+Resulting config:
+
+```toml
+[listen]
+host = "127.0.0.1"
+port = 1234
+
+[upstream]
+type = "direct"
+
+[fallback]
+type = "static"
+protocol = "http"
+host = "proxy-b.internal"
+port = 1234
+connect_timeout_ms = 3000
+```
+
+### Example 6 — Running the wizard when the daemon is stopped
 
 The config is still written to disk; only the live reload is skipped.
 
@@ -248,7 +282,7 @@ Start the daemon afterwards to apply it:
 localproxy start
 ```
 
-### Example 6 — Changing only the listen port
+### Example 7 — Changing only the listen port
 
 Every prompt is pre-filled, so you only touch what you need. Press <kbd>Enter</kbd> on everything else.
 
@@ -393,7 +427,7 @@ connect_timeout_ms = 3000
 
 ## [upstream]
 
-Four types are supported: `none`, `gateway`, `saved`, `static`.
+Five types are supported: `none`, `direct`, `gateway`, `saved`, `static`.
 
 ### upstream = none
 
@@ -402,6 +436,15 @@ No upstream proxy. Traffic is forwarded only if the fallback allows it.
 ```toml
 [upstream]
 type = "none"
+```
+
+### upstream = direct
+
+Direct connection as the primary route: localproxy connects to the destination itself, without any upstream proxy. If the direct connection fails, the fallback is tried, so this is the way to prefer direct traffic and keep a proxy in reserve.
+
+```toml
+[upstream]
+type = "direct"
 ```
 
 ### upstream = gateway
@@ -516,9 +559,9 @@ connect_timeout_ms = 3000
 
 ## Resolution order
 
-1. Try the primary upstream (if resolvable).
+1. Try the primary upstream: a direct connection when `upstream = "direct"`, otherwise the upstream proxy (if resolvable).
 2. Try the fallback proxy (if configured as `saved` or `static`).
-3. Attempt a direct connection if `fallback = "direct"` or no upstream is configured.
+3. Attempt a direct connection if `fallback = "direct"` or no upstream is configured. It is never queued twice, so `upstream = "direct"` with `fallback = "direct"` leaves a single direct route.
 4. Return `502 Bad Gateway` to the client if nothing succeeds.
 
 ## Complete examples
@@ -537,6 +580,26 @@ type = "none"
 
 [fallback]
 type = "direct"
+```
+
+### Direct upstream with a proxy fallback
+
+Go out directly whenever possible and only use the proxy when the direct connection fails.
+
+```toml
+[listen]
+host = "127.0.0.1"
+port = 1234
+
+[upstream]
+type = "direct"
+
+[fallback]
+type = "static"
+protocol = "http"
+host = "10.10.10.10"
+port = 1234
+connect_timeout_ms = 3000
 ```
 
 ### Gateway upstream with direct fallback

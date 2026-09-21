@@ -16,6 +16,7 @@ localproxy is a local proxy daemon written in Rust. It listens on localhost and 
 - CONNECT tunneling for HTTPS traffic (no MITM).
 - Static HTTP or SOCKS5 upstream.
 - Dynamic upstream based on the system default gateway.
+- Direct upstream that tries the destination without any proxy and keeps the fallback in reserve.
 - Static or direct fallback.
 - Daemon with pidfile, lockfile and Unix control socket.
 - Interactive wizard to generate the TOML configuration.
