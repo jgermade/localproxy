@@ -421,7 +421,8 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
 async fn resolve_routes(state: &SharedState) -> (Vec<Route>, bool) {
     let config = state.config.read().await.clone();
     let gateway = *state.gateway_ip.read().await;
-    let upstream_present = config::resolve_upstream_endpoint(&config, gateway).is_some();
+    let upstream_present = config::resolve_upstream_endpoint(&config, gateway).is_some()
+        || config::upstream_allows_direct(&config.upstream);
     (
         resolve_routes_from_config(&config, gateway),
         upstream_present,
@@ -500,8 +501,11 @@ fn record_upstream_failure(
 
 fn resolve_routes_from_config(config: &AppConfig, gateway: Option<IpAddr>) -> Vec<Route> {
     let mut routes = Vec::new();
+    let direct_upstream = config::upstream_allows_direct(&config.upstream);
 
-    if let Some(upstream) = config::resolve_upstream_endpoint(config, gateway) {
+    if direct_upstream {
+        routes.push(Route::Direct);
+    } else if let Some(upstream) = config::resolve_upstream_endpoint(config, gateway) {
         routes.push(Route::Proxy(upstream));
     }
 
@@ -509,8 +513,9 @@ fn resolve_routes_from_config(config: &AppConfig, gateway: Option<IpAddr>) -> Ve
         routes.push(Route::Proxy(fallback));
     }
 
-    if config::fallback_allows_direct(&config.fallback)
-        || matches!(config.upstream, config::UpstreamConfig::None)
+    if !direct_upstream
+        && (config::fallback_allows_direct(&config.fallback)
+            || matches!(config.upstream, config::UpstreamConfig::None))
     {
         routes.push(Route::Direct);
     }
@@ -832,6 +837,43 @@ mod tests {
     }
 
     #[test]
+    fn a_direct_upstream_is_tried_before_the_fallback_proxy() {
+        let config = AppConfig {
+            upstream: UpstreamConfig::Direct,
+            fallback: FallbackConfig::Static {
+                protocol: ProxyProtocol::Http,
+                host: "10.0.0.1".to_string(),
+                port: 3128,
+                connect_timeout_ms: 3_000,
+            },
+            ..AppConfig::default()
+        };
+
+        let routes = resolve_routes_from_config(&config, None);
+
+        assert_eq!(
+            routes.iter().map(describe_route).collect::<Vec<_>>(),
+            vec!["direct", "http://10.0.0.1:3128"]
+        );
+    }
+
+    #[test]
+    fn a_direct_upstream_is_not_duplicated_by_a_direct_fallback() {
+        let config = AppConfig {
+            upstream: UpstreamConfig::Direct,
+            fallback: FallbackConfig::Direct,
+            ..AppConfig::default()
+        };
+
+        let routes = resolve_routes_from_config(&config, None);
+
+        assert_eq!(
+            routes.iter().map(describe_route).collect::<Vec<_>>(),
+            vec!["direct"]
+        );
+    }
+
+    #[test]
     fn upstream_fallback_and_direct_are_tried_in_order() {
         let config = AppConfig {
             upstream: UpstreamConfig::Saved {
@@ -880,6 +922,23 @@ mod tests {
             routes.iter().map(describe_route).collect::<Vec<_>>(),
             vec!["http://10.0.0.1:3128"]
         );
+    }
+
+    #[tokio::test]
+    async fn a_direct_upstream_counts_as_a_present_upstream() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = AppConfig {
+            upstream: UpstreamConfig::Direct,
+            fallback: FallbackConfig::None,
+            ..AppConfig::default()
+        };
+        let state = crate::testing::state(crate::testing::paths(dir.path()), config);
+
+        let (routes, upstream_present) = resolve_routes(&state).await;
+
+        assert!(upstream_present);
+        assert_eq!(routes.len(), 1);
+        assert!(matches!(routes[0], Route::Direct));
     }
 
     #[tokio::test]

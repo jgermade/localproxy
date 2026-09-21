@@ -287,6 +287,31 @@ async fn an_unreachable_upstream_falls_back_to_the_direct_route() {
 }
 
 #[tokio::test]
+async fn a_direct_upstream_bypasses_the_fallback_proxy() {
+    let origin = spawn_origin().await;
+    let (fallback, seen) = spawn_fake_http_proxy(true).await;
+    let mut config = config_listening_on(free_port().await);
+    config.upstream = UpstreamConfig::Direct;
+    config.fallback = FallbackConfig::Static {
+        protocol: ProxyProtocol::Http,
+        host: fallback.ip().to_string(),
+        port: fallback.port(),
+        connect_timeout_ms: 3_000,
+    };
+    let (state, proxy_addr, _dir) = spawn_proxy(config).await;
+
+    let response = send_through_proxy(
+        proxy_addr,
+        &format!("GET http://{origin}/direct HTTP/1.1\r\nHost: {origin}\r\n\r\n"),
+    )
+    .await;
+
+    assert!(response.contains("GET /direct HTTP/1.1"));
+    assert!(seen.lock().unwrap().is_empty());
+    state.shutdown.cancel();
+}
+
+#[tokio::test]
 async fn requests_without_any_working_route_return_502() {
     let dead_port = free_port().await;
     let mut config = config_listening_on(free_port().await);

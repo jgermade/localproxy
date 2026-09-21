@@ -10,6 +10,7 @@ use localproxy::config::{
     AppConfig, AppPaths, FallbackConfig, LimitsConfig, ListenConfig, NotificationsConfig,
     ProxyProtocol, SavedProxy, UpstreamConfig, fallback_allows_direct, gateway_poll_interval_secs,
     load_or_create, resolve_fallback_endpoint, resolve_upstream_endpoint, save, summarize,
+    upstream_allows_direct,
 };
 
 fn paths_in(dir: &Path) -> AppPaths {
@@ -379,6 +380,39 @@ fn upstream_none_resolves_to_no_endpoint() {
 }
 
 #[test]
+fn direct_upstream_is_read_from_toml_and_resolves_to_no_endpoint() {
+    let raw = r#"
+        [upstream]
+        type = "direct"
+
+        [fallback]
+        type = "static"
+        host = "10.0.0.1"
+        port = 3128
+    "#;
+
+    let config: AppConfig = toml::from_str(raw).unwrap();
+
+    assert!(matches!(config.upstream, UpstreamConfig::Direct));
+    assert!(resolve_upstream_endpoint(&config, None).is_none());
+    assert!(upstream_allows_direct(&config.upstream));
+
+    let serialized = toml::to_string_pretty(&config).unwrap();
+    let parsed: AppConfig = toml::from_str(&serialized).unwrap();
+
+    assert!(matches!(parsed.upstream, UpstreamConfig::Direct));
+}
+
+#[test]
+fn only_the_direct_upstream_allows_direct_connections() {
+    assert!(upstream_allows_direct(&UpstreamConfig::Direct));
+    assert!(!upstream_allows_direct(&UpstreamConfig::None));
+    assert!(!upstream_allows_direct(&UpstreamConfig::Saved {
+        name: "corp".to_string()
+    }));
+}
+
+#[test]
 fn gateway_upstream_needs_a_detected_gateway() {
     let config = AppConfig {
         upstream: UpstreamConfig::Gateway {
@@ -525,4 +559,15 @@ fn summarize_renders_every_field() {
         "listen=127.0.0.1:1234 upstream=gateway:http:1234 fallback=direct gateway=192.168.1.1"
     );
     assert!(summarize(&config, None).ends_with("gateway=unknown"));
+
+    let direct = AppConfig {
+        upstream: UpstreamConfig::Direct,
+        fallback: FallbackConfig::None,
+        ..AppConfig::default()
+    };
+
+    assert_eq!(
+        summarize(&direct, None),
+        "listen=127.0.0.1:1234 upstream=direct fallback=none gateway=unknown"
+    );
 }

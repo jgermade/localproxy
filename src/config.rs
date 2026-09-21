@@ -198,6 +198,7 @@ impl LimitsConfig {
 pub enum UpstreamConfig {
     #[default]
     None,
+    Direct,
     Gateway {
         #[serde(default)]
         protocol: ProxyProtocol,
@@ -426,7 +427,7 @@ pub fn resolve_upstream_endpoint(
     gateway_ip: Option<IpAddr>,
 ) -> Option<ProxyEndpoint> {
     match &config.upstream {
-        UpstreamConfig::None => None,
+        UpstreamConfig::None | UpstreamConfig::Direct => None,
         UpstreamConfig::Gateway {
             protocol,
             port,
@@ -480,6 +481,10 @@ pub fn gateway_poll_interval_secs(config: &UpstreamConfig) -> u64 {
     }
 }
 
+pub fn upstream_allows_direct(config: &UpstreamConfig) -> bool {
+    matches!(config, UpstreamConfig::Direct)
+}
+
 pub fn fallback_allows_direct(config: &FallbackConfig) -> bool {
     matches!(config, FallbackConfig::Direct)
 }
@@ -501,7 +506,11 @@ fn prompt_upstream(
     current: &UpstreamConfig,
     proxies: &[SavedProxy],
 ) -> Result<UpstreamConfig> {
-    let mut modes = vec![UpstreamKind::None, UpstreamKind::Gateway];
+    let mut modes = vec![
+        UpstreamKind::None,
+        UpstreamKind::Direct,
+        UpstreamKind::Gateway,
+    ];
     if !proxies.is_empty() {
         modes.push(UpstreamKind::Saved);
     }
@@ -521,6 +530,7 @@ fn prompt_upstream(
 
     match modes[mode] {
         UpstreamKind::None => Ok(UpstreamConfig::None),
+        UpstreamKind::Direct => Ok(UpstreamConfig::Direct),
         UpstreamKind::Gateway => {
             let protocol = prompt_protocol(theme, protocol_from_upstream(current))?;
             let port = Input::with_theme(theme)
@@ -625,6 +635,7 @@ fn prompt_fallback(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum UpstreamKind {
     None,
+    Direct,
     Gateway,
     Saved,
     Static,
@@ -634,6 +645,7 @@ impl UpstreamKind {
     fn of(config: &UpstreamConfig) -> Self {
         match config {
             UpstreamConfig::None => Self::None,
+            UpstreamConfig::Direct => Self::Direct,
             UpstreamConfig::Gateway { .. } => Self::Gateway,
             UpstreamConfig::Saved { .. } => Self::Saved,
             UpstreamConfig::Static { .. } => Self::Static,
@@ -643,6 +655,7 @@ impl UpstreamKind {
     fn label(self) -> &'static str {
         match self {
             Self::None => "none",
+            Self::Direct => "direct",
             Self::Gateway => "gateway",
             Self::Saved => "saved (lista de proxies)",
             Self::Static => "static",
@@ -828,7 +841,9 @@ fn protocol_from_upstream(config: &UpstreamConfig) -> ProxyProtocol {
         UpstreamConfig::Gateway { protocol, .. } | UpstreamConfig::Static { protocol, .. } => {
             *protocol
         }
-        UpstreamConfig::None | UpstreamConfig::Saved { .. } => ProxyProtocol::Http,
+        UpstreamConfig::None | UpstreamConfig::Direct | UpstreamConfig::Saved { .. } => {
+            ProxyProtocol::Http
+        }
     }
 }
 
@@ -856,7 +871,7 @@ fn host_from_fallback(config: &FallbackConfig) -> Option<String> {
 fn port_from_upstream(config: &UpstreamConfig) -> Option<u16> {
     match config {
         UpstreamConfig::Gateway { port, .. } | UpstreamConfig::Static { port, .. } => Some(*port),
-        UpstreamConfig::None | UpstreamConfig::Saved { .. } => None,
+        UpstreamConfig::None | UpstreamConfig::Direct | UpstreamConfig::Saved { .. } => None,
     }
 }
 
@@ -879,6 +894,7 @@ fn poll_interval_from_upstream(config: &UpstreamConfig) -> Option<u64> {
 fn describe_upstream(config: &UpstreamConfig) -> String {
     match config {
         UpstreamConfig::None => "none".to_string(),
+        UpstreamConfig::Direct => "direct".to_string(),
         UpstreamConfig::Gateway { protocol, port, .. } => {
             format!("gateway:{}:{}", protocol_name(*protocol), port)
         }
@@ -950,6 +966,7 @@ mod tests {
     #[test]
     fn descriptions_cover_every_upstream_and_fallback_variant() {
         assert_eq!(describe_upstream(&UpstreamConfig::None), "none");
+        assert_eq!(describe_upstream(&UpstreamConfig::Direct), "direct");
         assert_eq!(
             describe_upstream(&UpstreamConfig::Saved {
                 name: "corp".to_string()
@@ -1012,6 +1029,11 @@ mod tests {
         assert!(host_from_upstream(&gateway).is_none());
         assert_eq!(port_from_upstream(&gateway), Some(1080));
         assert!(port_from_upstream(&UpstreamConfig::None).is_none());
+        assert!(port_from_upstream(&UpstreamConfig::Direct).is_none());
+        assert!(matches!(
+            protocol_from_upstream(&UpstreamConfig::Direct),
+            ProxyProtocol::Http
+        ));
         assert_eq!(poll_interval_from_upstream(&gateway), Some(11));
         assert!(poll_interval_from_upstream(&statik).is_none());
 
@@ -1042,6 +1064,10 @@ mod tests {
     fn kind_helpers_map_variants_to_labels() {
         assert_eq!(UpstreamKind::of(&UpstreamConfig::None), UpstreamKind::None);
         assert_eq!(
+            UpstreamKind::of(&UpstreamConfig::Direct),
+            UpstreamKind::Direct
+        );
+        assert_eq!(
             UpstreamKind::of(&UpstreamConfig::Saved {
                 name: "corp".to_string()
             }),
@@ -1050,6 +1076,7 @@ mod tests {
         assert_eq!(UpstreamKind::Gateway.label(), "gateway");
         assert_eq!(UpstreamKind::Static.label(), "static");
         assert_eq!(UpstreamKind::None.label(), "none");
+        assert_eq!(UpstreamKind::Direct.label(), "direct");
         assert!(UpstreamKind::Saved.label().starts_with("saved"));
 
         assert_eq!(
